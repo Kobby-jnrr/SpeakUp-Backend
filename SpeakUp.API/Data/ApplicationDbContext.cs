@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SpeakUp.API.Models.ReportModel;
+using SpeakUp.API.Models.UserModel;
 
 namespace SpeakUp.API.Data
 {
@@ -8,5 +10,8 @@ namespace SpeakUp.API.Data
             : base(options)
         {
         }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<Report> Reports { get; set; }
     }
 }
