@@ -7,7 +7,7 @@ namespace SpeakUp.API.Models.ReportModel
         public int Id { get; set; }
         public required string Title { get; set; }
         public required string Description { get; set; }
-        public ReportStatus Status { get; set; }
+        public ReportStatus Status { get; set; } = ReportStatus.Pending;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
 

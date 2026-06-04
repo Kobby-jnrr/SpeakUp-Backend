@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SpeakUp.API.Data;
@@ -11,9 +12,11 @@ using SpeakUp.API.Data;
 namespace SpeakUp.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260604023020_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -94,57 +97,18 @@ namespace SpeakUp.API.Migrations
                     b.Property<DateTime>("SentAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ChatConversationId");
 
                     b.HasIndex("SenderId");
 
+                    b.HasIndex("UserId");
+
                     b.ToTable("ChatMessages");
-                });
-
-            modelBuilder.Entity("SpeakUp.API.Models.ContentModel.HomePageContent", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("CreatedById")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("EndAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("StartAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedById");
-
-                    b.ToTable("HomePageContents");
                 });
 
             modelBuilder.Entity("SpeakUp.API.Models.ReportModel.Report", b =>
@@ -190,6 +154,9 @@ namespace SpeakUp.API.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedAdminId");
@@ -199,6 +166,8 @@ namespace SpeakUp.API.Migrations
                     b.HasIndex("PreviousAdminId");
 
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Reports");
                 });
@@ -247,7 +216,7 @@ namespace SpeakUp.API.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("SpeakUp.API.Models.UserModel.User", "PreviousAdmin")
-                        .WithMany()
+                        .WithMany("Conversations")
                         .HasForeignKey("PreviousAdminId");
 
                     b.HasOne("SpeakUp.API.Models.ReportModel.Report", "Report")
@@ -256,7 +225,7 @@ namespace SpeakUp.API.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("SpeakUp.API.Models.UserModel.User", "Student")
-                        .WithMany("Conversations")
+                        .WithMany()
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -279,25 +248,18 @@ namespace SpeakUp.API.Migrations
                         .IsRequired();
 
                     b.HasOne("SpeakUp.API.Models.UserModel.User", "Sender")
-                        .WithMany("Messages")
+                        .WithMany()
                         .HasForeignKey("SenderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SpeakUp.API.Models.UserModel.User", null)
+                        .WithMany("Messages")
+                        .HasForeignKey("UserId");
+
                     b.Navigation("ChatConversation");
 
                     b.Navigation("Sender");
-                });
-
-            modelBuilder.Entity("SpeakUp.API.Models.ContentModel.HomePageContent", b =>
-                {
-                    b.HasOne("SpeakUp.API.Models.UserModel.User", "CreatedBy")
-                        .WithMany()
-                        .HasForeignKey("CreatedById")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CreatedBy");
                 });
 
             modelBuilder.Entity("SpeakUp.API.Models.ReportModel.Report", b =>
@@ -318,10 +280,14 @@ namespace SpeakUp.API.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("SpeakUp.API.Models.UserModel.User", "Student")
-                        .WithMany("Reports")
+                        .WithMany()
                         .HasForeignKey("StudentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("SpeakUp.API.Models.UserModel.User", null)
+                        .WithMany("Reports")
+                        .HasForeignKey("UserId");
 
                     b.Navigation("AssignedAdmin");
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SpeakUp.API.Data;
 using SpeakUp.API.DTOs.Report;
+using SpeakUp.API.Models.ChatModel;
 using SpeakUp.API.Models.ReportModel;
 using SpeakUp.API.Models.UserModel;
 using System.Security.Claims;
@@ -42,6 +43,19 @@ public class ReportController : ControllerBase
         };
 
         _context.Reports.Add(report);
+        await _context.SaveChangesAsync();
+
+        var conversation = new ChatConversation
+        {
+            ChatType = ChatType.Report,
+            IsAnonymous = false,
+            StudentId = userId,
+            ReportId = report.Id,
+            Status = ConversationStatus.Open,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.ChatConversations.Add(conversation);
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -186,5 +200,26 @@ public class ReportController : ControllerBase
             to = report.AssignedAdminId,
             time = report.ReassignedAt
         });
+    }
+
+    //STUDENT: GET MY REPORTS
+    [Authorize]
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMyReports()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (claim == null)
+            return Unauthorized();
+
+        var userId = int.Parse(claim.Value);
+
+        var reports = await _context.Reports
+            .Where(r => r.StudentId == userId)
+            .Include(r => r.AssignedAdmin)
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync();
+
+        return Ok(reports);
     }
 }

@@ -4,5 +4,5 @@ namespace SpeakUp.API.DTOs.Report;
 
 public class UpdateStatusDto
 {
-    public required ReportStatus Status { get; set; }
+    public ReportStatus Status { get; set; }
 }
