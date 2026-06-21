@@ -11,6 +11,10 @@ public class User
 
     public required string LastName { get; set; }
 
+    public string? Gender { get; set; }
+
+    public string? Department { get; set; } = null!;
+
     public required string Email { get; set; }
 
     public required string PhoneNumber { get; set; }

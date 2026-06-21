@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SpeakUp.API.Data;
@@ -11,9 +12,11 @@ using SpeakUp.API.Data;
 namespace SpeakUp.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260604101402_HomePageContentAdded")]
+    partial class HomePageContentAdded
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -161,44 +164,11 @@ namespace SpeakUp.API.Migrations
                     b.Property<int?>("AssignedAdminId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("ComplainantGender")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ComplainantStudentId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ComplaintNature")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("Confidential")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ContactNumber")
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Department")
-                        .HasColumnType("text");
-
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DesiredOutcome")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<string>("IncidentDate")
-                        .HasColumnType("text");
-
-                    b.Property<string>("IncidentLocation")
-                        .HasColumnType("text");
-
-                    b.Property<string>("IncidentTime")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("LastModifiedAt")
@@ -210,23 +180,8 @@ namespace SpeakUp.API.Migrations
                     b.Property<int?>("PreviousAdminId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("PriorReportWhere")
-                        .HasColumnType("text");
-
                     b.Property<DateTime?>("ReassignedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RelationshipToComplainant")
-                        .HasColumnType("text");
-
-                    b.Property<string>("RespondentDepartment")
-                        .HasColumnType("text");
-
-                    b.Property<string>("RespondentName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("RespondentPosition")
-                        .HasColumnType("text");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -240,18 +195,6 @@ namespace SpeakUp.API.Migrations
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Witness1Contact")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Witness1Name")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Witness2Contact")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Witness2Name")
-                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -274,18 +217,12 @@ namespace SpeakUp.API.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Department")
-                        .HasColumnType("text");
-
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Gender")
                         .HasColumnType("text");
 
                     b.Property<string>("LastName")

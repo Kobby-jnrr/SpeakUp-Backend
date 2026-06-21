@@ -24,7 +24,6 @@ namespace SpeakUp.API.Controllers
         public async Task<IActionResult> SendMessage(SendMessageDto dto)
         {
             var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-
             if (claim == null)
                 return Unauthorized();
 
@@ -36,7 +35,6 @@ namespace SpeakUp.API.Controllers
             if (conversation == null)
                 return NotFound("Conversation not found");
 
-            // 🔥 SECURITY RULE: only participants can send messages
             var isParticipant =
                 conversation.StudentId == userId ||
                 conversation.AssignedAdminId == userId;
@@ -74,18 +72,35 @@ namespace SpeakUp.API.Controllers
         {
             var messages = await _context.ChatMessages
                 .Where(m => m.ChatConversationId == conversationId)
-                .Include(m => m.Sender)
                 .OrderBy(m => m.SentAt)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.ChatConversationId,
+                    m.Message,
+                    m.SentAt,
+                    m.IsRead,
+
+                    Sender = new
+                    {
+                        m.Sender.Id,
+                        m.Sender.FirstName,
+                        m.Sender.LastName,
+                        m.Sender.Role
+                    }
+                })
                 .ToListAsync();
 
             return Ok(messages);
         }
 
+
         [Authorize]
         [HttpPut("read/{messageId}")]
         public async Task<IActionResult> MarkAsRead(int messageId)
         {
-            var message = await _context.ChatMessages.FindAsync(messageId);
+            var message = await _context.ChatMessages
+                .FirstOrDefaultAsync(m => m.Id == messageId);
 
             if (message == null)
                 return NotFound();
@@ -94,7 +109,10 @@ namespace SpeakUp.API.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Marked as read" });
+            return Ok(new
+            {
+                message = "Marked as read"
+            });
         }
     }
 }

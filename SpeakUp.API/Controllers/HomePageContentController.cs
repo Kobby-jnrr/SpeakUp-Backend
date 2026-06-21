@@ -56,6 +56,26 @@ public class HomePageContentController : ControllerBase
         });
     }
 
+    // ADMIN: DELETE CONTENT
+    [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var content = await _context.HomePageContents.FindAsync(id);
+
+        if (content == null)
+            return NotFound("Content not found");
+
+        _context.HomePageContents.Remove(content);
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Content deleted successfully",
+            content.Id
+        });
+    }
+
     // ADMIN: GET ALL CONTENT
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
     [HttpGet("all")]
@@ -71,7 +91,11 @@ public class HomePageContentController : ControllerBase
                 Title = c.Title,
                 Content = c.Content,
                 ImageUrl = c.ImageUrl,
-                CreatedAt = c.CreatedAt
+                IsActive = c.IsActive,
+                CreatedAt = c.CreatedAt,
+                StartAt = c.StartAt,
+                EndAt = c.EndAt,
+                CreatedBy = c.CreatedBy.FirstName + " " + c.CreatedBy.LastName
             })
             .ToListAsync();
 

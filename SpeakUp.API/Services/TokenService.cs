@@ -17,6 +17,11 @@ public class TokenService
 
     public string CreateToken(User user)
     {
+        var jwtKey = _config["Jwt:Key"];
+
+        if (string.IsNullOrEmpty(jwtKey))
+            throw new Exception("JWT Key is missing in configuration");
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -25,7 +30,7 @@ public class TokenService
         };
 
         var key = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(_config["Jwt:Key"]!)
+            Encoding.UTF8.GetBytes(jwtKey)
         );
 
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -34,7 +39,7 @@ public class TokenService
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.Now.AddHours(2),
+            expires: DateTime.UtcNow.AddHours(2),
             signingCredentials: creds
         );
 

@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using SpeakUp.API.Data;
 using SpeakUp.API.Services;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 });
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<NotificationService>();
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(
+            new JsonStringEnumConverter()
+        );
+    });
+
+builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
 
 var app = builder.Build();
 
