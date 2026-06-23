@@ -11,6 +11,8 @@ public class Report
     public ReportStatus Status { get; set; } = ReportStatus.Pending;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+    public DateTime? ResolvedAt { get; set; }
+    public DateTime? ClosedAt { get; set; }
 
     public int StudentId { get; set; }
     public User Student { get; set; } = null!;

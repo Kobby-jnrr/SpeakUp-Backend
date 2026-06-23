@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SpeakUp.API.Data;
 using SpeakUp.API.DTOs.Report;
+using SpeakUp.API.Models.ChatModel;
 using SpeakUp.API.Models.ReportModel;
 using SpeakUp.API.Models.UserModel;
 using System.Security.Claims;
@@ -20,6 +21,22 @@ public class ReportController : ControllerBase
         _context = context;
     }
 
+    private async Task<string> GenerateReportCode(string firstName, string lastName)
+    {
+        var initials =
+            $"{firstName?.FirstOrDefault()}{lastName?.FirstOrDefault()}"
+            .ToUpper();
+
+        var lastId = await _context.Reports
+            .OrderByDescending(r => r.Id)
+            .Select(r => r.Id)
+            .FirstOrDefaultAsync();
+
+        var next = lastId + 1;
+
+        return $"{initials}-{next.ToString("D4")}";
+    }
+
     // STUDENT: CREATE REPORT
     [Authorize]
     [HttpPost("create")]
@@ -30,9 +47,15 @@ public class ReportController : ControllerBase
 
         var userId = int.Parse(claim.Value);
 
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return Unauthorized();
+
+        // 🔥 Generate code like KJ-0001
+        var code = await GenerateReportCode(user.FirstName, user.LastName);
+
         var report = new Report
         {
-            Title = dto.Title,
+            Title = $"Complaint {code}",
             Description = dto.Description,
             StudentId = userId,
             Status = ReportStatus.Pending,
@@ -169,6 +192,15 @@ public class ReportController : ControllerBase
         report.LastModifiedById = adminId;
         report.LastModifiedAt = DateTime.UtcNow;
 
+        var chat = await _context.ChatConversations
+            .FirstOrDefaultAsync(c => c.ReportId == reportId);
+
+        if (chat != null)
+        {
+            chat.AssignedAdminId = adminId;
+            chat.Status = ConversationStatus.Open;
+        }
+
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -196,8 +228,25 @@ public class ReportController : ControllerBase
 
         var isSuperAdmin = User.IsInRole("SuperAdmin");
 
+        // 🚨 HARD LOCK: Closed reports
+        if (report.Status == ReportStatus.Closed && !isSuperAdmin)
+            return Forbid("Closed reports can only be modified by SuperAdmin");
+
+        // 🚨 Only assigned admin can update (except SuperAdmin)
         if (!isSuperAdmin && report.AssignedAdminId != userId)
             return Forbid("You can only update assigned reports");
+
+        // 🟡 If moving TO Resolved, stamp time
+        if (dto.Status == ReportStatus.Resolved && report.Status != ReportStatus.Resolved)
+        {
+            report.ResolvedAt = DateTime.UtcNow;
+        }
+
+        // 🔴 If moving TO Closed, stamp close time
+        if (dto.Status == ReportStatus.Closed)
+        {
+            report.ClosedAt = DateTime.UtcNow;
+        }
 
         report.Status = dto.Status;
         report.UpdatedAt = DateTime.UtcNow;
@@ -267,50 +316,6 @@ public class ReportController : ControllerBase
             .Where(r => r.StudentId == userId)
             .Include(r => r.AssignedAdmin)
             .OrderByDescending(r => r.CreatedAt)
-            .Select(r => new
-            {
-                r.Id,
-                r.Title,
-                r.Description,
-                r.Status,
-                r.CreatedAt,
-                r.UpdatedAt,
-
-                r.ComplainantGender,
-                r.ComplainantStudentId,
-                r.Department,
-                r.ContactNumber,
-                r.Email,
-
-                r.RespondentName,
-                r.RespondentPosition,
-                r.RespondentDepartment,
-                r.RelationshipToComplainant,
-
-                r.IncidentDate,
-                r.IncidentTime,
-                r.IncidentLocation,
-
-                ComplaintNature = string.IsNullOrWhiteSpace(r.ComplaintNature)
-                ? new string[0]
-                : r.ComplaintNature.Split(", ", StringSplitOptions.RemoveEmptyEntries),
-
-                r.Witness1Name,
-                r.Witness1Contact,
-                r.Witness2Name,
-                r.Witness2Contact,
-
-                r.PriorReportWhere,
-                r.DesiredOutcome,
-                r.Confidential,
-
-                AssignedAdmin = r.AssignedAdmin == null ? null : new
-                {
-                    r.AssignedAdmin.Id,
-                    r.AssignedAdmin.FirstName,
-                    r.AssignedAdmin.LastName
-                }
-            })
             .ToListAsync();
 
         return Ok(reports);

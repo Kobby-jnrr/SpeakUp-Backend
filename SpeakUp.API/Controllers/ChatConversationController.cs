@@ -30,15 +30,21 @@ namespace SpeakUp.API.Controllers
 
             var userId = int.Parse(claim.Value);
 
-            // 🔥 CHECK IF CHAT ALREADY EXISTS FOR THIS REPORT
+            // 🔥 IF REPORT CHAT EXISTS, RETURN IT
             if (dto.ReportId != null)
             {
                 var existingChat = await _context.ChatConversations
-                    .FirstOrDefaultAsync(c => c.ReportId == dto.ReportId);
+                    .FirstOrDefaultAsync(c =>
+                        c.ReportId == dto.ReportId &&
+                        c.StudentId == userId);
 
                 if (existingChat != null)
                 {
-                    return BadRequest("Chat already exists for this report");
+                    return Ok(new
+                    {
+                        message = "Existing conversation found",
+                        id = existingChat.Id
+                    });
                 }
             }
 
@@ -52,15 +58,23 @@ namespace SpeakUp.API.Controllers
                 CreatedAt = DateTime.UtcNow
             };
 
+            if (dto.ReportId != null)
+            {
+                var report = await _context.Reports.FindAsync(dto.ReportId);
+
+                if (report != null && report.AssignedAdminId != null)
+                {
+                    conversation.AssignedAdminId = report.AssignedAdminId;
+                }
+            }
+
             _context.ChatConversations.Add(conversation);
             await _context.SaveChangesAsync();
 
             return Ok(new
             {
                 message = "Conversation created successfully",
-                conversation.Id,
-                conversation.ChatType,
-                conversation.Status
+                id = conversation.Id
             });
         }
 
@@ -69,10 +83,7 @@ namespace SpeakUp.API.Controllers
         [HttpGet("my")]
         public async Task<IActionResult> GetMyConversations(int page = 1, int pageSize = 10)
         {
-            var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (claim == null) return Unauthorized();
-
-            var userId = int.Parse(claim.Value);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
             var query = _context.ChatConversations
                 .Where(c => c.StudentId == userId || c.AssignedAdminId == userId);
@@ -81,6 +92,8 @@ namespace SpeakUp.API.Controllers
 
             var conversations = await query
                 .Include(c => c.Messages)
+                .Include(c => c.AssignedAdmin)
+                .Include(c => c.Student)
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -94,6 +107,18 @@ namespace SpeakUp.API.Controllers
                 IsAnonymous = c.IsAnonymous,
                 CreatedAt = c.CreatedAt,
 
+                ReportId = c.ReportId,
+
+                StudentId = c.StudentId,
+                StudentName = c.Student != null
+                    ? $"{c.Student.FirstName} {c.Student.LastName}"
+                    : "Unknown",
+
+                AssignedAdminId = c.AssignedAdminId,
+                AssignedAdminName = c.AssignedAdmin != null
+                    ? $"{c.AssignedAdmin.FirstName} {c.AssignedAdmin.LastName}"
+                    : "Unassigned",
+
                 LastMessage = c.Messages
                     .OrderByDescending(m => m.SentAt)
                     .Select(m => m.Message)
@@ -103,15 +128,9 @@ namespace SpeakUp.API.Controllers
                     .OrderByDescending(m => m.SentAt)
                     .Select(m => m.SentAt)
                     .FirstOrDefault()
-            }).ToList();
-
-            return Ok(new
-            {
-                items = result,
-                page,
-                pageSize,
-                totalCount
             });
+
+            return Ok(new { items = result, page, pageSize, totalCount });
         }
 
         // ADMIN: GET ALL CONVERSATIONS (PAGINATED)
@@ -119,12 +138,24 @@ namespace SpeakUp.API.Controllers
         [HttpGet("admin/all")]
         public async Task<IActionResult> GetAllConversations(int page = 1, int pageSize = 10)
         {
-            var query = _context.ChatConversations;
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var isSuperAdmin = User.IsInRole("SuperAdmin");
+
+            var query = _context.ChatConversations.AsQueryable();
+
+            if (!isSuperAdmin)
+            {
+                query = query.Where(c =>
+                    c.AssignedAdminId == null || c.AssignedAdminId == userId
+                );
+            }
 
             var totalCount = await query.CountAsync();
 
             var conversations = await query
                 .Include(c => c.Messages)
+                .Include(c => c.AssignedAdmin)
+                .Include(c => c.Student)
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -137,6 +168,17 @@ namespace SpeakUp.API.Controllers
                 Status = c.Status.ToString(),
                 IsAnonymous = c.IsAnonymous,
                 CreatedAt = c.CreatedAt,
+                ReportId = c.ReportId,
+
+                StudentId = c.StudentId,
+                StudentName = c.Student != null
+                    ? $"{c.Student.FirstName} {c.Student.LastName}"
+                    : "Unknown",
+
+                AssignedAdminId = c.AssignedAdminId,
+                AssignedAdminName = c.AssignedAdmin != null
+                    ? $"{c.AssignedAdmin.FirstName} {c.AssignedAdmin.LastName}"
+                    : "Unassigned",
 
                 LastMessage = c.Messages
                     .OrderByDescending(m => m.SentAt)
@@ -147,15 +189,9 @@ namespace SpeakUp.API.Controllers
                     .OrderByDescending(m => m.SentAt)
                     .Select(m => m.SentAt)
                     .FirstOrDefault()
-            }).ToList();
-
-            return Ok(new
-            {
-                items = result,
-                page,
-                pageSize,
-                totalCount
             });
+
+            return Ok(new { items = result, page, pageSize, totalCount });
         }
 
         // ADMIN: GET UNASSIGNED (QUEUE SYSTEM)
