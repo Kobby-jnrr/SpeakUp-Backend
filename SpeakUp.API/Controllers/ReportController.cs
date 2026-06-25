@@ -213,6 +213,55 @@ public class ReportController : ControllerBase
         });
     }
 
+    // ADMIN: GET MY ASSIGNED REPORTS
+    [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
+    [HttpGet("assigned-to-me")]
+    public async Task<IActionResult> GetAssignedToMe()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (claim == null) return Unauthorized();
+
+        var adminId = int.Parse(claim.Value);
+
+        var reports = await _context.Reports
+            .Where(r => r.AssignedAdminId == adminId)
+            .Include(r => r.Student)
+            .Include(r => r.AssignedAdmin)
+            .OrderByDescending(r => r.UpdatedAt)
+            .Select(r => new
+            {
+                r.Id,
+                r.Title,
+                r.Description,
+                r.Status,
+                r.CreatedAt,
+                r.UpdatedAt,
+                r.IncidentDate,
+                r.IncidentLocation,
+                r.Department,
+                r.ComplainantStudentId,
+                r.Confidential,
+
+                Student = r.Student == null ? null : new
+                {
+                    r.Student.Id,
+                    r.Student.FirstName,
+                    r.Student.LastName,
+                    r.Student.Email
+                },
+
+                AssignedAdmin = r.AssignedAdmin == null ? null : new
+                {
+                    r.AssignedAdmin.Id,
+                    r.AssignedAdmin.FirstName,
+                    r.AssignedAdmin.LastName
+                }
+            })
+            .ToListAsync();
+
+        return Ok(reports);
+    }
+
     // ADMIN: UPDATE STATUS
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
     [HttpPut("status/{reportId}")]
@@ -230,11 +279,13 @@ public class ReportController : ControllerBase
 
         // 🚨 HARD LOCK: Closed reports
         if (report.Status == ReportStatus.Closed && !isSuperAdmin)
-            return Forbid("Closed reports can only be modified by SuperAdmin");
+            return StatusCode(StatusCodes.Status403Forbidden,
+                "Closed reports can only be modified by SuperAdmin");
 
         // 🚨 Only assigned admin can update (except SuperAdmin)
         if (!isSuperAdmin && report.AssignedAdminId != userId)
-            return Forbid("You can only update assigned reports");
+            return StatusCode(StatusCodes.Status403Forbidden,
+    "You can only update assigned reports");
 
         // 🟡 If moving TO Resolved, stamp time
         if (dto.Status == ReportStatus.Resolved && report.Status != ReportStatus.Resolved)

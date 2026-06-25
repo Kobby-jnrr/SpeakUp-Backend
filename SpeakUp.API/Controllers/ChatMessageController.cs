@@ -40,7 +40,11 @@ namespace SpeakUp.API.Controllers
                 conversation.AssignedAdminId == userId;
 
             if (!isParticipant)
-                return Forbid("You are not part of this conversation");
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    error = "Forbidden",
+                    message = "You are not part of this conversation."
+                });
 
             var message = new ChatMessage
             {
