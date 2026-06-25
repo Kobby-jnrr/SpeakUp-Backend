@@ -79,4 +79,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+app.MapGet("/", () => "SpeakUp API is running 🚀");
+
 app.Run();
