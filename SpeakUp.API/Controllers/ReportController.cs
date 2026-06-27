@@ -105,6 +105,55 @@ public class ReportController : ControllerBase
         });
     }
 
+    // STUDENT: CREATE QUICK REPORT
+    [Authorize]
+    [HttpPost("quick")]
+    public async Task<IActionResult> CreateQuickReport(CreateQuickReportDto dto)
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (claim == null)
+            return Unauthorized();
+
+        var userId = int.Parse(claim.Value);
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+            return Unauthorized();
+
+        var code = await GenerateReportCode(user.FirstName, user.LastName);
+
+        var report = new Report
+        {
+            Title = $"Quick Report {code}",
+            Description = dto.Description,
+            StudentId = userId,
+
+            Status = ReportStatus.Pending,
+            Type = ReportType.Quick,
+
+            // If anonymous, don't store reporter details
+            ComplainantGender = dto.IsAnonymous ? null : user.Gender,
+            Department = dto.IsAnonymous ? null : user.Department,
+            ContactNumber = dto.IsAnonymous ? null : user.PhoneNumber,
+            Email = dto.IsAnonymous ? null : user.Email,
+
+            Confidential = dto.IsAnonymous
+        };
+
+        _context.Reports.Add(report);
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Quick report submitted successfully",
+            report.Id,
+            report.Title,
+            report.Type,
+            report.Status,
+            report.CreatedAt
+        });
+    }
+
     // ADMIN: GET ALL REPORTS
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
     [HttpGet("all")]
@@ -119,6 +168,7 @@ public class ReportController : ControllerBase
                 r.Id,
                 r.Title,
                 r.Description,
+                r.Type,
                 r.Status,
                 r.CreatedAt,
                 r.UpdatedAt,
@@ -233,6 +283,7 @@ public class ReportController : ControllerBase
                 r.Id,
                 r.Title,
                 r.Description,
+                r.Type,
                 r.Status,
                 r.CreatedAt,
                 r.UpdatedAt,
