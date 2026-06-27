@@ -106,9 +106,7 @@ namespace SpeakUp.API.Controllers
                 Status = c.Status.ToString(),
                 IsAnonymous = c.IsAnonymous,
                 CreatedAt = c.CreatedAt,
-
                 ReportId = c.ReportId,
-
                 StudentId = c.StudentId,
                 StudentName = c.Student != null
                     ? $"{c.Student.FirstName} {c.Student.LastName}"
@@ -123,6 +121,10 @@ namespace SpeakUp.API.Controllers
                     .OrderByDescending(m => m.SentAt)
                     .Select(m => m.Message)
                     .FirstOrDefault(),
+                UnreadCount = c.Messages.Count(m =>
+                    !m.IsRead &&
+                    m.SenderId != userId
+                    ),
 
                 LastMessageTime = c.Messages
                     .OrderByDescending(m => m.SentAt)
@@ -184,6 +186,10 @@ namespace SpeakUp.API.Controllers
                     .OrderByDescending(m => m.SentAt)
                     .Select(m => m.Message)
                     .FirstOrDefault(),
+                UnreadCount = c.Messages.Count(m =>
+                    !m.IsRead &&
+                    m.SenderId != userId
+                    ),
 
                 LastMessageTime = c.Messages
                     .OrderByDescending(m => m.SentAt)

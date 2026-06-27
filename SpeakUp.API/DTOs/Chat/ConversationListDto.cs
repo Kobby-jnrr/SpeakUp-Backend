@@ -8,6 +8,8 @@
 
     public DateTime CreatedAt { get; set; }
 
+    public int UnreadCount { get; set; }
+
     public int? ReportId { get; set; }
 
     public int StudentId { get; set; }

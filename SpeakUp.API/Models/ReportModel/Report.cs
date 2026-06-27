@@ -62,4 +62,6 @@ public class Report
     public string? DesiredOutcome { get; set; }
 
     public bool Confidential { get; set; } = false;
+
+    public ReportType Type { get; set; } = ReportType.Full;
 }

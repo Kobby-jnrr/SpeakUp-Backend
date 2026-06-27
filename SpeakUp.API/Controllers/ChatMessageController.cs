@@ -55,9 +55,15 @@ namespace SpeakUp.API.Controllers
                 IsRead = false
             };
 
-            _context.ChatMessages.Add(message);
+            if (conversation.Status == ConversationStatus.Closed)
+            {
+                return BadRequest(new
+                {
+                    message = "This conversation has been closed by the administrator."
+                });
+            }
 
-            conversation.Status = ConversationStatus.Open;
+            _context.ChatMessages.Add(message);
 
             await _context.SaveChangesAsync();
 
@@ -116,6 +122,33 @@ namespace SpeakUp.API.Controllers
             return Ok(new
             {
                 message = "Marked as read"
+            });
+        }
+
+        [Authorize]
+        [HttpPut("read/conversation/{conversationId}")]
+        public async Task<IActionResult> MarkConversationAsRead(int conversationId)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            var messages = await _context.ChatMessages
+                .Where(m =>
+                    m.ChatConversationId == conversationId &&
+                    m.SenderId != userId && 
+                    !m.IsRead)
+                .ToListAsync();
+
+            foreach (var msg in messages)
+            {
+                msg.IsRead = true;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Conversation marked as read",
+                updated = messages.Count
             });
         }
     }
