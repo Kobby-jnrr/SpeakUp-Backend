@@ -25,12 +25,8 @@ namespace SpeakUp.API.Controllers
         [HttpPost("create")]
         public async Task<IActionResult> CreateConversation(CreateConversationDto dto)
         {
-            var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (claim == null) return Unauthorized();
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-            var userId = int.Parse(claim.Value);
-
-            // 🔥 IF REPORT CHAT EXISTS, RETURN IT
             if (dto.ReportId != null)
             {
                 var existingChat = await _context.ChatConversations
@@ -62,7 +58,7 @@ namespace SpeakUp.API.Controllers
             {
                 var report = await _context.Reports.FindAsync(dto.ReportId);
 
-                if (report != null && report.AssignedAdminId != null)
+                if (report?.AssignedAdminId != null)
                 {
                     conversation.AssignedAdminId = report.AssignedAdminId;
                 }
@@ -78,7 +74,7 @@ namespace SpeakUp.API.Controllers
             });
         }
 
-        // USER: GET MY CONVERSATIONS (PAGINATED)
+        // USER: MY CONVERSATIONS
         [Authorize]
         [HttpGet("my")]
         public async Task<IActionResult> GetMyConversations(int page = 1, int pageSize = 10)
@@ -91,51 +87,20 @@ namespace SpeakUp.API.Controllers
             var totalCount = await query.CountAsync();
 
             var conversations = await query
-                .Include(c => c.Messages)
-                .Include(c => c.AssignedAdmin)
                 .Include(c => c.Student)
+                .Include(c => c.AssignedAdmin)
+                .Include(c => c.Messages)
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            var result = conversations.Select(c => new ConversationListDto
-            {
-                Id = c.Id,
-                ChatType = c.ChatType.ToString(),
-                Status = c.Status.ToString(),
-                IsAnonymous = c.IsAnonymous,
-                CreatedAt = c.CreatedAt,
-                ReportId = c.ReportId,
-                StudentId = c.StudentId,
-                StudentName = c.Student != null
-                    ? $"{c.Student.FirstName} {c.Student.LastName}"
-                    : "Unknown",
-
-                AssignedAdminId = c.AssignedAdminId,
-                AssignedAdminName = c.AssignedAdmin != null
-                    ? $"{c.AssignedAdmin.FirstName} {c.AssignedAdmin.LastName}"
-                    : "Unassigned",
-
-                LastMessage = c.Messages
-                    .OrderByDescending(m => m.SentAt)
-                    .Select(m => m.Message)
-                    .FirstOrDefault(),
-                UnreadCount = c.Messages.Count(m =>
-                    !m.IsRead &&
-                    m.SenderId != userId
-                    ),
-
-                LastMessageTime = c.Messages
-                    .OrderByDescending(m => m.SentAt)
-                    .Select(m => m.SentAt)
-                    .FirstOrDefault()
-            });
+            var result = conversations.Select(c => MapConversation(c, userId));
 
             return Ok(new { items = result, page, pageSize, totalCount });
         }
 
-        // ADMIN: GET ALL CONVERSATIONS (PAGINATED)
+        // ADMIN: ALL CONVERSATIONS
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpGet("admin/all")]
         public async Task<IActionResult> GetAllConversations(int page = 1, int pageSize = 10)
@@ -148,103 +113,87 @@ namespace SpeakUp.API.Controllers
             if (!isSuperAdmin)
             {
                 query = query.Where(c =>
-                    c.AssignedAdminId == null || c.AssignedAdminId == userId
-                );
+                    c.AssignedAdminId == null ||
+                    c.AssignedAdminId == userId);
             }
 
             var totalCount = await query.CountAsync();
 
             var conversations = await query
-                .Include(c => c.Messages)
-                .Include(c => c.AssignedAdmin)
                 .Include(c => c.Student)
+                .Include(c => c.AssignedAdmin)
+                .Include(c => c.Messages)
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            var result = conversations.Select(c => new ConversationListDto
-            {
-                Id = c.Id,
-                ChatType = c.ChatType.ToString(),
-                Status = c.Status.ToString(),
-                IsAnonymous = c.IsAnonymous,
-                CreatedAt = c.CreatedAt,
-                ReportId = c.ReportId,
-
-                StudentId = c.StudentId,
-                StudentName = c.Student != null
-                    ? $"{c.Student.FirstName} {c.Student.LastName}"
-                    : "Unknown",
-
-                AssignedAdminId = c.AssignedAdminId,
-                AssignedAdminName = c.AssignedAdmin != null
-                    ? $"{c.AssignedAdmin.FirstName} {c.AssignedAdmin.LastName}"
-                    : "Unassigned",
-
-                LastMessage = c.Messages
-                    .OrderByDescending(m => m.SentAt)
-                    .Select(m => m.Message)
-                    .FirstOrDefault(),
-                UnreadCount = c.Messages.Count(m =>
-                    !m.IsRead &&
-                    m.SenderId != userId
-                    ),
-
-                LastMessageTime = c.Messages
-                    .OrderByDescending(m => m.SentAt)
-                    .Select(m => m.SentAt)
-                    .FirstOrDefault()
-            });
+            var result = conversations.Select(c => MapConversation(c, userId));
 
             return Ok(new { items = result, page, pageSize, totalCount });
         }
 
-        // ADMIN: GET UNASSIGNED (QUEUE SYSTEM)
+        // ADMIN: UNASSIGNED
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpGet("admin/unassigned")]
         public async Task<IActionResult> GetUnassigned()
         {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             var conversations = await _context.ChatConversations
                 .Where(c => c.AssignedAdminId == null)
+                .Include(c => c.Student)
+                .Include(c => c.AssignedAdmin)
+                .Include(c => c.Messages)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
-            return Ok(conversations);
+            var result = conversations.Select(c => MapConversation(c, userId));
+
+            return Ok(new { items = result });
         }
 
-        // ADMIN: GET MY ASSIGNED CHATS
+        // ADMIN: ASSIGNED TO ME
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpGet("admin/assigned-to-me")]
         public async Task<IActionResult> GetMyAssignedChats()
         {
-            var claim = User.FindFirst(ClaimTypes.NameIdentifier);
-            if (claim == null) return Unauthorized();
-
-            var adminId = int.Parse(claim.Value);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
             var conversations = await _context.ChatConversations
-                .Where(c => c.AssignedAdminId == adminId)
+                .Where(c => c.AssignedAdminId == userId)
+                .Include(c => c.Student)
+                .Include(c => c.AssignedAdmin)
+                .Include(c => c.Messages)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
-            return Ok(conversations);
+            var result = conversations.Select(c => MapConversation(c, userId));
+
+            return Ok(new { items = result });
         }
 
-        // ADMIN: GET CLOSED CHATS
+        // ADMIN: CLOSED
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpGet("admin/closed")]
         public async Task<IActionResult> GetClosedChats()
         {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             var conversations = await _context.ChatConversations
                 .Where(c => c.Status == ConversationStatus.Closed)
+                .Include(c => c.Student)
+                .Include(c => c.AssignedAdmin)
+                .Include(c => c.Messages)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
-            return Ok(conversations);
+            var result = conversations.Select(c => MapConversation(c, userId));
+
+            return Ok(new { items = result });
         }
 
-        // ADMIN: ASSIGN ADMIN
+        // ASSIGN ADMIN
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpPut("assign")]
         public async Task<IActionResult> AssignAdmin(AssignAdminDto dto)
@@ -262,10 +211,7 @@ namespace SpeakUp.API.Controllers
                 return NotFound("Admin not found");
 
             if (admin.Role != UserRole.JuniorAdmin && admin.Role != UserRole.SuperAdmin)
-                return BadRequest("User is not an admin");
-
-            if (conversation.AssignedAdminId == dto.AdminId)
-                return BadRequest("Already assigned to this admin");
+                return BadRequest("Invalid admin role");
 
             conversation.PreviousAdminId = conversation.AssignedAdminId;
             conversation.AssignedAdminId = dto.AdminId;
@@ -281,18 +227,21 @@ namespace SpeakUp.API.Controllers
             });
         }
 
+        // BY REPORT
         [Authorize]
         [HttpGet("by-report/{reportId}")]
         public async Task<IActionResult> GetChatByReport(int reportId)
         {
             var conversation = await _context.ChatConversations
                 .Include(c => c.Messages)
+                .Include(c => c.Student)
+                .Include(c => c.AssignedAdmin)
                 .FirstOrDefaultAsync(c => c.ReportId == reportId);
 
             if (conversation == null)
-                return NotFound("No chat found for this report");
+                return NotFound("No chat found");
 
-            var result = new
+            return Ok(new
             {
                 conversation.Id,
                 conversation.ChatType,
@@ -300,7 +249,6 @@ namespace SpeakUp.API.Controllers
                 conversation.IsAnonymous,
                 conversation.CreatedAt,
                 conversation.ClosedAt,
-
                 Messages = conversation.Messages
                     .OrderBy(m => m.SentAt)
                     .Select(m => new
@@ -311,16 +259,16 @@ namespace SpeakUp.API.Controllers
                         m.SentAt,
                         m.IsRead
                     })
-            };
-
-            return Ok(result);
+            });
         }
 
-        // ADMIN: CLOSE CONVERSATION
+        // CLOSE CHAT (STRICT OWNERSHIP)
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpPut("close/{conversationId}")]
         public async Task<IActionResult> CloseConversation(int conversationId)
         {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
             var conversation = await _context.ChatConversations
                 .FirstOrDefaultAsync(c => c.Id == conversationId);
 
@@ -328,7 +276,19 @@ namespace SpeakUp.API.Controllers
                 return NotFound("Conversation not found");
 
             if (conversation.Status == ConversationStatus.Closed)
-                return BadRequest("Conversation is already closed");
+                return BadRequest("Already closed");
+
+            if (conversation.AssignedAdminId == null)
+                return BadRequest("Conversation has not been claimed yet");
+
+            if (conversation.AssignedAdminId != userId)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new
+                {
+                    error = "Forbidden",
+                    message = "Only the assigned admin can close this conversation"
+                });
+            }
 
             conversation.Status = ConversationStatus.Closed;
             conversation.ClosedAt = DateTime.UtcNow;
@@ -342,6 +302,42 @@ namespace SpeakUp.API.Controllers
                 conversation.Status,
                 conversation.ClosedAt
             });
+        }
+
+        private object MapConversation(ChatConversation c, int userId)
+        {
+            return new ConversationListDto
+            {
+                Id = c.Id,
+                ChatType = c.ChatType.ToString(),
+                Status = c.Status.ToString(),
+                IsAnonymous = c.IsAnonymous,
+                CreatedAt = c.CreatedAt,
+                ReportId = c.ReportId,
+
+                StudentId = c.StudentId,
+                StudentName = c.Student != null
+                    ? $"{c.Student.FirstName} {c.Student.LastName}"
+                    : "Unknown Student",
+
+                AssignedAdminId = c.AssignedAdminId,
+                AssignedAdminName = c.AssignedAdmin != null
+                    ? $"{c.AssignedAdmin.FirstName} {c.AssignedAdmin.LastName}"
+                    : "Unassigned",
+
+                LastMessage = c.Messages
+                    .OrderByDescending(m => m.SentAt)
+                    .Select(m => m.Message)
+                    .FirstOrDefault(),
+
+                UnreadCount = c.Messages.Count(m =>
+                    !m.IsRead && m.SenderId != userId),
+
+                LastMessageTime = c.Messages
+                    .OrderByDescending(m => m.SentAt)
+                    .Select(m => m.SentAt)
+                    .FirstOrDefault()
+            };
         }
     }
 }

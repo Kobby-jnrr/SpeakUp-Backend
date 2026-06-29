@@ -136,7 +136,7 @@ public class AuthController : ControllerBase
 
     [Authorize(Roles = "SuperAdmin")]
     [HttpPost("create-junior-admin")]
-    public async Task<IActionResult> CreateJuniorAdmin(CreateJuniorAdminDto dto)
+    public async Task<IActionResult> CreateJuniorAdmin(CreateAdminDto dto)
     {
         var existingUser = await _context.Users
             .FirstOrDefaultAsync(x => x.Email == dto.Email);
@@ -160,6 +160,44 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             message = "Junior Admin created successfully",
+            admin.Id,
+            admin.Email,
+            admin.Role
+        });
+    }
+
+    [Authorize(Roles = "SuperAdmin")]
+    [HttpPost("create-super-admin")]
+    public async Task<IActionResult> CreateSuperAdmin(CreateAdminDto dto)
+    {
+        var existingUser = await _context.Users
+            .FirstOrDefaultAsync(x => x.Email == dto.Email);
+
+        if (existingUser != null)
+            return BadRequest("User already exists");
+
+        var superAdminCount = await _context.Users
+            .CountAsync(u => u.Role == UserRole.SuperAdmin);
+
+        if (superAdminCount >= 3)
+            return BadRequest("Maximum SuperAdmins reached.");
+
+        var admin = new User
+        {
+            FirstName = dto.FirstName,
+            LastName = dto.LastName,
+            Email = dto.Email,
+            PhoneNumber = dto.PhoneNumber,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            Role = UserRole.SuperAdmin
+        };
+
+        _context.Users.Add(admin);
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Super Admin created successfully",
             admin.Id,
             admin.Email,
             admin.Role

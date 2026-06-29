@@ -3,6 +3,6 @@
 public enum ChatType
 {
     Report,
-    Anonymous,
+    Counseling,
     Support
 }
