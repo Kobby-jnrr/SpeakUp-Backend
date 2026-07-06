@@ -3,6 +3,7 @@ using SpeakUp.API.Models.ChatModel;
 using SpeakUp.API.Models.ContentModel;
 using SpeakUp.API.Models.ReportModel;
 using SpeakUp.API.Models.UserModel;
+using SpeakUp.API.Models.ResourceModel;
 
 namespace SpeakUp.API.Data
 {
@@ -18,6 +19,7 @@ namespace SpeakUp.API.Data
         public DbSet<ChatConversation> ChatConversations { get; set; }
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<HomePageContent> HomePageContents {  get; set; }
+        public DbSet<Resource> Resources { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -86,6 +88,10 @@ namespace SpeakUp.API.Data
                 .WithMany()
                 .HasForeignKey(h => h.CreatedById)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Resource>()
+                .Property(r => r.Category)
+                .HasConversion<string>();
         }
     }
 }
