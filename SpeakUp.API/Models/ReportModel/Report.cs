@@ -14,8 +14,8 @@ public class Report
     public DateTime? ResolvedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
 
-    public int StudentId { get; set; }
-    public User Student { get; set; } = null!;
+    public int? StudentId { get; set; }
+    public User? Student { get; set; }
 
 
     public int? AssignedAdminId { get; set; }

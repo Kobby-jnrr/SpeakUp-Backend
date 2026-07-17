@@ -53,7 +53,6 @@ public class ReportController : ControllerBase
         var user = await _context.Users.FindAsync(userId);
         if (user == null) return Unauthorized();
 
-        // 🔥 Generate code like KJ-0001
         var code = await GenerateReportCode(user.FirstName, user.LastName);
 
         var report = new Report
@@ -99,6 +98,7 @@ public class ReportController : ControllerBase
         {
             message = "Report created successfully",
             report.Id,
+            ReportCode = $"REP-{report.Id.ToString().PadLeft(6, '0')}",
             report.Title,
             report.Status,
             report.CreatedAt,
@@ -114,45 +114,69 @@ public class ReportController : ControllerBase
     public async Task<IActionResult> CreateQuickReport(CreateQuickReportDto dto)
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+
         if (claim == null)
             return Unauthorized();
 
         var userId = int.Parse(claim.Value);
 
         var user = await _context.Users.FindAsync(userId);
+
         if (user == null)
             return Unauthorized();
 
+
         var code = await GenerateReportCode(user.FirstName, user.LastName);
+
 
         var report = new Report
         {
             Title = $"Quick Report {code}",
-            Description = dto.Description,
-            StudentId = userId,
 
+            Description = dto.Description,
+            StudentId = dto.IsAnonymous ? null : userId,
             Status = ReportStatus.Pending,
             Type = ReportType.Quick,
 
-            // If anonymous, don't store reporter details
-            ComplainantGender = dto.IsAnonymous ? null : user.Gender,
-            Department = dto.IsAnonymous ? null : user.Department,
-            ContactNumber = dto.IsAnonymous ? null : user.PhoneNumber,
-            Email = dto.IsAnonymous ? null : user.Email,
+            ComplainantGender = dto.IsAnonymous
+                ? null
+                : user.Gender,
+
+            Department = dto.IsAnonymous
+                ? null
+                : user.Department,
+
+            ContactNumber = dto.IsAnonymous
+                ? null
+                : user.PhoneNumber,
+
+            Email = dto.IsAnonymous
+                ? null
+                : user.Email,
 
             Confidential = dto.IsAnonymous
         };
 
+
         _context.Reports.Add(report);
+
         await _context.SaveChangesAsync();
+
 
         return Ok(new
         {
             message = "Quick report submitted successfully",
+
             report.Id,
+
+            ReportCode = $"REP-{report.Id.ToString().PadLeft(6, '0')}",
+
             report.Title,
+
             report.Type,
+
             report.Status,
+
             report.CreatedAt
         });
     }
@@ -169,6 +193,7 @@ public class ReportController : ControllerBase
             .Select(r => new
             {
                 r.Id,
+                ReportCode = $"REP-{r.Id.ToString().PadLeft(6, '0')}",
                 r.Title,
                 r.Description,
                 r.Type,
@@ -290,6 +315,7 @@ public class ReportController : ControllerBase
             .Select(r => new
             {
                 r.Id,
+                ReportCode = $"REP-{r.Id.ToString().PadLeft(6, '0')}",
                 r.Title,
                 r.Description,
                 r.Type,
@@ -440,6 +466,27 @@ public class ReportController : ControllerBase
             .Where(r => r.StudentId == userId)
             .Include(r => r.AssignedAdmin)
             .OrderByDescending(r => r.CreatedAt)
+            .Select(r => new
+            {
+                r.Id,
+
+                ReportCode = $"REP-{r.Id.ToString().PadLeft(6, '0')}",
+
+                r.Title,
+                r.Description,
+                r.Status,
+                r.CreatedAt,
+                r.Type,
+
+                AssignedAdmin = r.AssignedAdmin == null
+                    ? null
+                    : new
+                    {
+                        r.AssignedAdmin.Id,
+                        r.AssignedAdmin.FirstName,
+                        r.AssignedAdmin.LastName
+                    }
+            })
             .ToListAsync();
 
         return Ok(reports);

@@ -127,6 +127,7 @@ namespace SpeakUp.API.Controllers
                 .Include(c => c.Student)
                 .Include(c => c.AssignedAdmin)
                 .Include(c => c.Messages)
+                .Include(c => c.Report)
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -190,6 +191,7 @@ namespace SpeakUp.API.Controllers
                 .Include(c => c.Student)
                 .Include(c => c.AssignedAdmin)
                 .Include(c => c.Messages)
+                .Include(c => c.Report)
                 .OrderByDescending(c => c.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -232,6 +234,7 @@ namespace SpeakUp.API.Controllers
                 .Include(c => c.Student)
                 .Include(c => c.AssignedAdmin)
                 .Include(c => c.Messages)
+                .Include(c => c.Report)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
@@ -270,6 +273,7 @@ namespace SpeakUp.API.Controllers
                 .Include(c => c.Student)
                 .Include(c => c.AssignedAdmin)
                 .Include(c => c.Messages)
+                .Include(c => c.Report)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
@@ -308,6 +312,7 @@ namespace SpeakUp.API.Controllers
                 .Include(c => c.Student)
                 .Include(c => c.AssignedAdmin)
                 .Include(c => c.Messages)
+                .Include(c => c.Report)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
@@ -422,6 +427,7 @@ namespace SpeakUp.API.Controllers
                 .Include(c => c.Messages)
                 .Include(c => c.Student)
                 .Include(c => c.AssignedAdmin)
+                .Include(c => c.Report)
                 .FirstOrDefaultAsync(c =>
                     c.ReportId == reportId);
 
@@ -552,6 +558,10 @@ namespace SpeakUp.API.Controllers
                 CreatedAt = c.CreatedAt,
 
                 ReportId = c.ReportId,
+
+                ReportCode = c.Report != null
+                    ? $"REP-{c.Report.Id.ToString().PadLeft(6, '0')}"
+                    : null,
 
 
                 StudentId = c.StudentId,

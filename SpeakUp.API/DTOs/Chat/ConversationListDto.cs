@@ -11,6 +11,7 @@
     public int UnreadCount { get; set; }
 
     public int? ReportId { get; set; }
+    public string? ReportCode { get; set; }
 
     public int StudentId { get; set; }
     public string? StudentName { get; set; }

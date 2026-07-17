@@ -39,7 +39,7 @@ public class TokenService
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(2),
+            expires: DateTime.UtcNow.AddDays(7),
             signingCredentials: creds
         );
 
