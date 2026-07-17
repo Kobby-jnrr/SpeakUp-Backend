@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SpeakUp.API.Data;
 using SpeakUp.API.DTOs.Content;
 using SpeakUp.API.Models.ContentModel;
+using SpeakUp.API.Services;
 using System.Security.Claims;
 
 namespace SpeakUp.API.Controllers;
@@ -13,11 +14,16 @@ namespace SpeakUp.API.Controllers;
 public class HomePageContentController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly AuditService _auditService;
 
-    public HomePageContentController(ApplicationDbContext context)
+    public HomePageContentController(
+        ApplicationDbContext context,
+        AuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
+
 
     // ADMIN: CREATE CONTENT
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
@@ -31,21 +37,34 @@ public class HomePageContentController : ControllerBase
 
         var userId = int.Parse(claim.Value);
 
+
         var content = new HomePageContent
         {
             Type = dto.Type,
             Title = dto.Title,
             Content = dto.Content,
             ImageUrl = dto.ImageUrl,
+
             StartAt = dto.StartAt,
             EndAt = dto.EndAt,
+
             CreatedById = userId,
             IsActive = true,
+
             CreatedAt = DateTime.UtcNow
         };
 
+
         _context.HomePageContents.Add(content);
         await _context.SaveChangesAsync();
+
+
+        await _auditService.Log(
+            userId,
+            "Created Homepage Content",
+            $"Created {content.Type}: {content.Title}"
+        );
+
 
         return Ok(new
         {
@@ -56,18 +75,42 @@ public class HomePageContentController : ControllerBase
         });
     }
 
+
+
     // ADMIN: DELETE CONTENT
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var content = await _context.HomePageContents.FindAsync(id);
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (claim == null)
+            return Unauthorized();
+
+        var userId = int.Parse(claim.Value);
+
+
+        var content = await _context.HomePageContents
+            .FindAsync(id);
+
 
         if (content == null)
             return NotFound("Content not found");
 
+
         _context.HomePageContents.Remove(content);
+
         await _context.SaveChangesAsync();
+
+
+
+        await _auditService.Log(
+            userId,
+            "Deleted Homepage Content",
+            $"Deleted content: {content.Title}"
+        );
+
+
 
         return Ok(new
         {
@@ -75,6 +118,9 @@ public class HomePageContentController : ControllerBase
             content.Id
         });
     }
+
+
+
 
     // ADMIN: GET ALL CONTENT
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
@@ -91,31 +137,68 @@ public class HomePageContentController : ControllerBase
                 Title = c.Title,
                 Content = c.Content,
                 ImageUrl = c.ImageUrl,
+
                 IsActive = c.IsActive,
+
                 CreatedAt = c.CreatedAt,
+
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
-                CreatedBy = c.CreatedBy.FirstName + " " + c.CreatedBy.LastName
+
+                CreatedBy =
+                    c.CreatedBy.FirstName + " " +
+                    c.CreatedBy.LastName
             })
             .ToListAsync();
 
+
         return Ok(content);
     }
+
+
+
+
 
     // ADMIN: TOGGLE ACTIVE/INACTIVE
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
     [HttpPut("toggle/{id}")]
     public async Task<IActionResult> Toggle(int id)
     {
-        var content = await _context.HomePageContents.FindAsync(id);
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier);
+
+        if (claim == null)
+            return Unauthorized();
+
+
+        var userId = int.Parse(claim.Value);
+
+
+
+        var content = await _context.HomePageContents
+            .FindAsync(id);
+
 
         if (content == null)
             return NotFound("Content not found");
 
+
+
         content.IsActive = !content.IsActive;
+
         content.UpdatedAt = DateTime.UtcNow;
 
+
         await _context.SaveChangesAsync();
+
+
+
+        await _auditService.Log(
+            userId,
+            "Updated Homepage Content Status",
+            $"{content.Title} changed to {(content.IsActive ? "Active" : "Inactive")}"
+        );
+
+
 
         return Ok(new
         {
@@ -125,6 +208,11 @@ public class HomePageContentController : ControllerBase
         });
     }
 
+
+
+
+
+
     // STUDENT: GET ACTIVE HOMEPAGE CONTENT
     [AllowAnonymous]
     [HttpGet("home")]
@@ -132,12 +220,15 @@ public class HomePageContentController : ControllerBase
     {
         var now = DateTime.UtcNow;
 
+
         var content = await _context.HomePageContents
             .Where(c =>
                 c.IsActive &&
                 (c.StartAt == null || c.StartAt <= now) &&
                 (c.EndAt == null || c.EndAt >= now))
             .ToListAsync();
+
+
 
         var hero = content
             .Where(c => c.Type == ContentType.Hero)
@@ -153,6 +244,8 @@ public class HomePageContentController : ControllerBase
             })
             .ToList();
 
+
+
         var bulletin = content
             .Where(c => c.Type == ContentType.Bulletin)
             .OrderByDescending(c => c.CreatedAt)
@@ -167,10 +260,15 @@ public class HomePageContentController : ControllerBase
             })
             .ToList();
 
+
+
+
         var safetyTips = content
             .Where(c => c.Type == ContentType.SafetyTip)
             .OrderByDescending(c => c.CreatedAt)
             .ToList();
+
+
 
         var randomSafetyTip = safetyTips
             .OrderBy(_ => Guid.NewGuid())
@@ -184,6 +282,9 @@ public class HomePageContentController : ControllerBase
                 CreatedAt = c.CreatedAt
             })
             .FirstOrDefault();
+
+
+
 
         return Ok(new
         {

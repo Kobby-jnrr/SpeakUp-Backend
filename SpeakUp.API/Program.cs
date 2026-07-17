@@ -53,6 +53,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<AuditService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

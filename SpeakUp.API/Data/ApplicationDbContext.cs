@@ -1,9 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SpeakUp.API.Models.AuditModel;
 using SpeakUp.API.Models.ChatModel;
 using SpeakUp.API.Models.ContentModel;
 using SpeakUp.API.Models.ReportModel;
-using SpeakUp.API.Models.UserModel;
 using SpeakUp.API.Models.ResourceModel;
+using SpeakUp.API.Models.UserModel;
 
 namespace SpeakUp.API.Data
 {
@@ -20,6 +21,7 @@ namespace SpeakUp.API.Data
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<HomePageContent> HomePageContents {  get; set; }
         public DbSet<Resource> Resources { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

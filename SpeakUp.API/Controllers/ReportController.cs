@@ -6,6 +6,7 @@ using SpeakUp.API.DTOs.Report;
 using SpeakUp.API.Models.ChatModel;
 using SpeakUp.API.Models.ReportModel;
 using SpeakUp.API.Models.UserModel;
+using SpeakUp.API.Services;
 using System.Security.Claims;
 
 namespace SpeakUp.API.Controllers;
@@ -15,10 +16,12 @@ namespace SpeakUp.API.Controllers;
 public class ReportController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly AuditService _auditService;
 
-    public ReportController(ApplicationDbContext context)
+    public ReportController( ApplicationDbContext context, AuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     private async Task<string> GenerateReportCode(string firstName, string lastName)
@@ -253,6 +256,12 @@ public class ReportController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        await _auditService.Log(
+            adminId,
+            "Claimed Report",
+            $"Report #{report.Id} claimed"
+        );
+
         return Ok(new
         {
             message = "Report claimed successfully",
@@ -350,6 +359,7 @@ public class ReportController : ControllerBase
             report.ClosedAt = DateTime.UtcNow;
         }
 
+        var oldStatus = report.Status;
         report.Status = dto.Status;
         report.UpdatedAt = DateTime.UtcNow;
 
@@ -357,6 +367,12 @@ public class ReportController : ControllerBase
         report.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+
+        await _auditService.Log(
+            userId,
+            "Changed Report Status",
+            $"Report #{report.Id}: {oldStatus} → {dto.Status}"
+        );
 
         return Ok(new
         {
@@ -394,6 +410,12 @@ public class ReportController : ControllerBase
         report.LastModifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+
+        await _auditService.Log(
+            superAdminId,
+            "Reassigned Report",
+            $"Report #{report.Id} reassigned to Admin ID {newAdminId}"
+        );
 
         return Ok(new
         {
