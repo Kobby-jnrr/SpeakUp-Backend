@@ -27,7 +27,6 @@ namespace SpeakUp.API.Controllers
         }
 
 
-
         // CREATE CONVERSATION
         [Authorize]
         [HttpPost("create")]
@@ -96,10 +95,6 @@ namespace SpeakUp.API.Controllers
         }
 
 
-
-
-
-
         // USER: MY CONVERSATIONS
         [Authorize]
         [HttpGet("my")]
@@ -148,11 +143,6 @@ namespace SpeakUp.API.Controllers
                 totalCount
             });
         }
-
-
-
-
-
 
 
         // ADMIN: ALL CONVERSATIONS
@@ -214,11 +204,6 @@ namespace SpeakUp.API.Controllers
         }
 
 
-
-
-
-
-
         // ADMIN: UNASSIGNED
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpGet("admin/unassigned")]
@@ -250,12 +235,6 @@ namespace SpeakUp.API.Controllers
                 items = result
             });
         }
-
-
-
-
-
-
 
 
         // ADMIN: ASSIGNED TO ME
@@ -291,12 +270,6 @@ namespace SpeakUp.API.Controllers
         }
 
 
-
-
-
-
-
-
         // ADMIN: CLOSED
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpGet("admin/closed")]
@@ -330,12 +303,6 @@ namespace SpeakUp.API.Controllers
         }
 
 
-
-
-
-
-
-
         // ASSIGN ADMIN
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpPut("assign")]
@@ -348,21 +315,16 @@ namespace SpeakUp.API.Controllers
 
 
             var conversation = await _context.ChatConversations
-                .FirstOrDefaultAsync(c =>
-                    c.Id == dto.ConversationId);
-
-
+                .Include(c => c.Student)
+                .Include(c => c.AssignedAdmin)
+                .FirstOrDefaultAsync(c => c.Id == dto.ConversationId);
 
             if (conversation == null)
                 return NotFound("Conversation not found");
 
-
-
             var admin = await _context.Users
                 .FirstOrDefaultAsync(u =>
                     u.Id == dto.AdminId);
-
-
 
             if (admin == null)
                 return NotFound("Admin not found");
@@ -375,8 +337,6 @@ namespace SpeakUp.API.Controllers
                 return BadRequest("Invalid admin role");
             }
 
-
-
             conversation.PreviousAdminId =
                 conversation.AssignedAdminId;
 
@@ -384,21 +344,21 @@ namespace SpeakUp.API.Controllers
             conversation.AssignedAdminId =
                 dto.AdminId;
 
-
             conversation.Status =
                 ConversationStatus.Open;
 
-
-
             await _context.SaveChangesAsync();
 
-
-
+            var studentName = conversation.IsAnonymous
+            ? "Anonymous User"
+            : conversation.Student != null
+                ? $"{conversation.Student.FirstName} {conversation.Student.LastName}"
+                : "Unknown Student";
 
             await _auditService.Log(
                 userId,
                 "Claimed Chat",
-                $"Conversation #{conversation.Id} assigned to {admin.FirstName} {admin.LastName}"
+                $"{studentName}'s conversation was assigned to {admin.FirstName} {admin.LastName}."
             );
 
 
@@ -410,12 +370,6 @@ namespace SpeakUp.API.Controllers
                 conversation.AssignedAdminId
             });
         }
-
-
-
-
-
-
 
 
         // BY REPORT
@@ -461,12 +415,6 @@ namespace SpeakUp.API.Controllers
         }
 
 
-
-
-
-
-
-
         // CLOSE CHAT
         [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
         [HttpPut("close/{conversationId}")]
@@ -479,25 +427,17 @@ namespace SpeakUp.API.Controllers
 
 
             var conversation = await _context.ChatConversations
-                .FirstOrDefaultAsync(c =>
-                    c.Id == conversationId);
-
-
+                .Include(c => c.Student)
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
 
             if (conversation == null)
                 return NotFound("Conversation not found");
 
-
-
             if (conversation.Status == ConversationStatus.Closed)
                 return BadRequest("Already closed");
 
-
-
             if (conversation.AssignedAdminId == null)
                 return BadRequest("Conversation has not been claimed yet");
-
-
 
             if (conversation.AssignedAdminId != userId)
             {
@@ -508,23 +448,24 @@ namespace SpeakUp.API.Controllers
             }
 
 
-
             conversation.Status = ConversationStatus.Closed;
             conversation.ClosedAt = DateTime.UtcNow;
-
 
 
             await _context.SaveChangesAsync();
 
 
-
+            var studentName = conversation.IsAnonymous
+            ? "Anonymous User"
+            : conversation.Student != null
+                ? $"{conversation.Student.FirstName} {conversation.Student.LastName}"
+                : "Unknown Student";
 
             await _auditService.Log(
                 userId,
                 "Closed Chat",
-                $"Conversation #{conversation.Id} closed"
+                $"{studentName}'s conversation was closed."
             );
-
 
 
             return Ok(new
@@ -535,10 +476,6 @@ namespace SpeakUp.API.Controllers
                 conversation.ClosedAt
             });
         }
-
-
-
-
 
 
         private object MapConversation(
@@ -566,33 +503,26 @@ namespace SpeakUp.API.Controllers
 
                 StudentId = c.StudentId,
 
-                StudentName = c.Student != null
-                    ? $"{c.Student.FirstName} {c.Student.LastName}"
-                    : "Unknown Student",
-
-
+                StudentName = c.IsAnonymous
+                    ? "Anonymous User"
+                    : c.Student != null
+                        ? $"{c.Student.FirstName} {c.Student.LastName}"
+                        : "Unknown Student",
 
                 AssignedAdminId = c.AssignedAdminId,
-
 
                 AssignedAdminName = c.AssignedAdmin != null
                     ? $"{c.AssignedAdmin.FirstName} {c.AssignedAdmin.LastName}"
                     : "Unassigned",
-
-
 
                 LastMessage = c.Messages
                     .OrderByDescending(m => m.SentAt)
                     .Select(m => m.Message)
                     .FirstOrDefault(),
 
-
-
                 UnreadCount = c.Messages.Count(m =>
                     !m.IsRead &&
                     m.SenderId != userId),
-
-
 
                 LastMessageTime = c.Messages
                     .OrderByDescending(m => m.SentAt)

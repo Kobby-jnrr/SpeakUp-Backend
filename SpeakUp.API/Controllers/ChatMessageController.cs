@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SpeakUp.API.Data;
 using SpeakUp.API.DTOs.Chat;
 using SpeakUp.API.Models.ChatModel;
+using SpeakUp.API.Models.UserModel;
 using System.Security.Claims;
 
 namespace SpeakUp.API.Controllers
@@ -80,26 +81,48 @@ namespace SpeakUp.API.Controllers
         [HttpGet("{conversationId}")]
         public async Task<IActionResult> GetMessages(int conversationId)
         {
-            var messages = await _context.ChatMessages
-                .Where(m => m.ChatConversationId == conversationId)
-                .OrderBy(m => m.SentAt)
-                .Select(m => new
-                {
-                    m.Id,
-                    m.ChatConversationId,
-                    m.Message,
-                    m.SentAt,
-                    m.IsRead,
+            var userId = int.Parse(
+                User.FindFirst(ClaimTypes.NameIdentifier)!.Value
+            );
 
-                    Sender = new
-                    {
-                        m.Sender.Id,
-                        m.Sender.FirstName,
-                        m.Sender.LastName,
-                        m.Sender.Role
-                    }
-                })
-                .ToListAsync();
+
+            var conversation = await _context.ChatConversations
+                .Include(c => c.Student)
+                .FirstOrDefaultAsync(c => c.Id == conversationId);
+
+
+            if (conversation == null)
+                return NotFound("Conversation not found");
+
+
+            var messages = await _context.ChatMessages
+            .Where(m => m.ChatConversationId == conversationId)
+            .OrderBy(m => m.SentAt)
+            .Select(m => new
+            {
+                m.Id,
+                m.ChatConversationId,
+                m.Message,
+                m.SentAt,
+                m.IsRead,
+
+                Sender = new
+                {
+                    Id = m.Sender.Id,
+
+                    Name =
+        conversation.IsAnonymous &&
+        m.Sender.Role == UserRole.Student
+            ? "Anonymous User"
+            : $"{m.Sender.FirstName} {m.Sender.LastName}",
+
+                    Role = m.Sender.Role.ToString(),
+
+                    IsCurrentUser = m.Sender.Id == userId
+                }
+            })
+            .ToListAsync();
+
 
             return Ok(messages);
         }

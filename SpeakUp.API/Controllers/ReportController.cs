@@ -134,7 +134,7 @@ public class ReportController : ControllerBase
             Title = $"Quick Report {code}",
 
             Description = dto.Description,
-            StudentId = dto.IsAnonymous ? null : userId,
+            StudentId = userId,
             Status = ReportStatus.Pending,
             Type = ReportType.Quick,
 
@@ -228,7 +228,9 @@ public class ReportController : ControllerBase
                 r.DesiredOutcome,
                 r.Confidential,
 
-                Student = r.Student == null ? null : new
+                Student = r.Confidential
+                ? null
+                : r.Student == null ? null : new
                 {
                     r.Student.Id,
                     r.Student.FirstName,
@@ -258,7 +260,11 @@ public class ReportController : ControllerBase
 
         var adminId = int.Parse(claim.Value);
 
-        var report = await _context.Reports.FindAsync(reportId);
+        var report = await _context.Reports
+            .Include(r => r.Student)
+            .Include(r => r.AssignedAdmin)
+            .FirstOrDefaultAsync(r => r.Id == reportId); ;
+
         if (report == null) return NotFound("Report not found");
 
         if (report.AssignedAdminId != null)
@@ -281,11 +287,17 @@ public class ReportController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        await _auditService.Log(
-            adminId,
-            "Claimed Report",
-            $"Report #{report.Id} claimed"
-        );
+        var studentName = report.Student != null
+            ? $"{report.Student.FirstName} {report.Student.LastName}"
+            : "Anonymous Student";
+
+         var admin = await _context.Users.FindAsync(adminId);
+
+          await _auditService.Log(
+              adminId,
+              "Claimed Report",
+              $"{studentName}'s report was claimed by {admin!.FirstName} {admin.LastName}."
+              );
 
         return Ok(new
         {
@@ -358,8 +370,12 @@ public class ReportController : ControllerBase
 
         var userId = int.Parse(claim.Value);
 
-        var report = await _context.Reports.FindAsync(reportId);
-        if (report == null) return NotFound("Report not found");
+        var report = await _context.Reports
+            .Include(r => r.Student)
+            .FirstOrDefaultAsync(r => r.Id == reportId);
+
+        if (report == null)
+            return NotFound("Report not found");
 
         var isSuperAdmin = User.IsInRole("SuperAdmin");
 
@@ -394,10 +410,14 @@ public class ReportController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        var studentName = report.Student != null
+            ? $"{report.Student.FirstName} {report.Student.LastName}"
+            : "Anonymous Student";
+
         await _auditService.Log(
             userId,
             "Changed Report Status",
-            $"Report #{report.Id}: {oldStatus} → {dto.Status}"
+            $"{studentName}'s report status changed from {oldStatus} to {dto.Status}."
         );
 
         return Ok(new
@@ -418,8 +438,12 @@ public class ReportController : ControllerBase
 
         var superAdminId = int.Parse(claim.Value);
 
-        var report = await _context.Reports.FindAsync(reportId);
-        if (report == null) return NotFound("Report not found");
+        var report = await _context.Reports
+            .Include(r => r.Student)
+            .FirstOrDefaultAsync(r => r.Id == reportId);
+
+        if (report == null)
+            return NotFound("Report not found");
 
         if (report.AssignedAdminId == newAdminId)
             return BadRequest("Already assigned to this admin");
@@ -437,10 +461,14 @@ public class ReportController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        var studentName = report.Student != null
+            ? $"{report.Student.FirstName} {report.Student.LastName}"
+            : "Anonymous Student";
+
         await _auditService.Log(
             superAdminId,
             "Reassigned Report",
-            $"Report #{report.Id} reassigned to Admin ID {newAdminId}"
+            $"{studentName}'s report was reassigned to {newAdmin.FirstName} {newAdmin.LastName}."
         );
 
         return Ok(new
