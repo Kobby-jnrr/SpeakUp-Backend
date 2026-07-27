@@ -29,6 +29,10 @@ public class User
 
     public DateTime? EmailVerificationExpiry { get; set; }
 
+    public string? PasswordResetToken { get; set; }
+
+    public DateTime? PasswordResetExpiry { get; set; }
+
     public ICollection<Report> Reports { get; set; } = new List<Report>();
     public ICollection<ChatConversation> Conversations { get; set; } = new List<ChatConversation>();
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();

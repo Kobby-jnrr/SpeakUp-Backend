@@ -191,6 +191,106 @@ public class AuthController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+    ForgotPasswordDto dto)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(x => x.Email == dto.Email);
+
+
+        // Always return same response
+        if (user == null)
+        {
+            return Ok(new
+            {
+                message =
+                "If the account exists, a reset link has been sent."
+            });
+        }
+
+
+        var token =
+            Guid.NewGuid().ToString();
+
+
+        user.PasswordResetToken = token;
+
+        user.PasswordResetExpiry =
+            DateTime.UtcNow.AddMinutes(15);
+
+
+        await _context.SaveChangesAsync();
+
+
+        await _emailService.SendPasswordResetEmail(
+            user.Email,
+            token
+        );
+
+
+        return Ok(new
+        {
+            message =
+            "If the account exists, a reset link has been sent."
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+    ResetPasswordDto dto)
+    {
+        var user = await _context.Users
+            .FirstOrDefaultAsync(x => x.Email == dto.Email);
+
+
+        if (user == null)
+        {
+            return BadRequest(
+                "Invalid reset request."
+            );
+        }
+
+
+        if (user.PasswordResetToken != dto.Token)
+        {
+            return BadRequest(
+                "Invalid reset token."
+            );
+        }
+
+
+        if (user.PasswordResetExpiry < DateTime.UtcNow)
+        {
+            return BadRequest(
+                "Reset link expired."
+            );
+        }
+
+
+        user.PasswordHash =
+            BCrypt.Net.BCrypt.HashPassword(
+                dto.NewPassword
+            );
+
+
+        user.PasswordResetToken = null;
+
+        user.PasswordResetExpiry = null;
+
+
+        await _context.SaveChangesAsync();
+
+
+        return Ok(new
+        {
+            message =
+            "Password reset successful."
+        });
+    }
+
     // LOGIN
     [AllowAnonymous]
     [HttpPost("login")]
@@ -205,9 +305,11 @@ public class AuthController : ControllerBase
 
         if (!user.EmailVerified)
         {
-            return BadRequest(
-               "Please verify your email before logging in."
-            );
+            return BadRequest(new
+            {
+                code = "EMAIL_NOT_VERIFIED",
+                message = "Email not verified."
+            });
         }
 
 
