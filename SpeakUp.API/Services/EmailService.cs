@@ -12,7 +12,6 @@ public class EmailService
         _configuration = configuration;
     }
 
-
     public async Task SendVerificationEmail(
         string email,
         string code)
@@ -36,7 +35,6 @@ public class EmailService
                 "Email settings are missing in appsettings.json"
             );
         }
-
 
         using var smtp = new SmtpClient
         {
@@ -100,7 +98,5 @@ public class EmailService
         mail.To.Add(email);
 
         await smtp.SendMailAsync(mail);
-        await smtp.SendMailAsync(mail);
-       
     }
 }

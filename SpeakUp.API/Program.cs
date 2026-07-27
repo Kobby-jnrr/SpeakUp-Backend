@@ -54,7 +54,7 @@ builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<AuditService>();
-builder.Services.AddScoped<EmailService>();
+builder.Services.AddSingleton<EmailService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
