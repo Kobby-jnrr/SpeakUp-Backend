@@ -82,14 +82,24 @@ public class AuthController : ControllerBase
 
         try
         {
+            Console.WriteLine("Starting email sending...");
+
             await _emailService.SendVerificationEmail(
                 user.Email,
                 user.EmailVerificationCode!
             );
+
+            Console.WriteLine("Email sent successfully!");
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            Console.WriteLine(
+                $"EMAIL ERROR: {ex.Message}"
+            );
+
+            Console.WriteLine(
+                ex.StackTrace
+            );
         }
 
         return Ok(new
