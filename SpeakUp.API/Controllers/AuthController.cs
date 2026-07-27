@@ -80,22 +80,17 @@ public class AuthController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await _emailService.SendVerificationEmail(
-                    user.Email,
-                    user.EmailVerificationCode!
-                );
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(
-                    $"Failed to send verification email: {ex.Message}"
-                );
-            }
-        });
+            await _emailService.SendVerificationEmail(
+                user.Email,
+                user.EmailVerificationCode!
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+        }
 
         return Ok(new
         {
