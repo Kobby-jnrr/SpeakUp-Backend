@@ -170,22 +170,23 @@ public class AuthController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await _emailService.SendVerificationEmail(
-                    user.Email,
-                    user.EmailVerificationCode!
-                );
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(
-                    $"Failed to resend verification email: {ex.Message}"
-                );
-            }
-        });
+            Console.WriteLine("Starting resend email...");
+
+            await _emailService.SendVerificationEmail(
+                user.Email,
+                user.EmailVerificationCode!
+            );
+
+            Console.WriteLine("Resend email sent successfully!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"Failed to resend verification email: {ex.Message}"
+            );
+        }
 
         return Ok(new
         {

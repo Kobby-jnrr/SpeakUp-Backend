@@ -1,63 +1,50 @@
-﻿using System.Net;
-using System.Net.Mail;
+﻿using Resend;
 
 namespace SpeakUp.API.Services;
 
 public class EmailService
 {
+    private readonly ResendClient _resend;
     private readonly IConfiguration _configuration;
 
-    public EmailService(IConfiguration configuration)
+
+    public EmailService(
+        ResendClient resend,
+        IConfiguration configuration)
     {
+        _resend = resend;
         _configuration = configuration;
     }
+
 
     public async Task SendVerificationEmail(
         string email,
         string code)
     {
-        var settings =
-            _configuration.GetSection("EmailSettings");
+
+        var fromEmail =
+            _configuration["Resend:FromEmail"];
 
 
-        var senderEmail = settings["Email"];
-        var password = settings["Password"];
-        var host = settings["Host"];
-        var portString = settings["Port"];
-
-
-        if (string.IsNullOrEmpty(senderEmail) ||
-            string.IsNullOrEmpty(password) ||
-            string.IsNullOrEmpty(host) ||
-            string.IsNullOrEmpty(portString))
+        if (string.IsNullOrEmpty(fromEmail))
         {
             throw new Exception(
-                "Email settings are missing in appsettings.json"
+                "Resend FromEmail missing."
             );
         }
 
-        using var smtp = new SmtpClient
+
+        var message = new EmailMessage
         {
-            Host = host,
-            Port = int.Parse(portString),
-            EnableSsl = true,
-            UseDefaultCredentials = false,
-            Credentials = new NetworkCredential(
-                senderEmail,
-                password
-            )
-        };
+            From = fromEmail,
 
-        using var mail = new MailMessage
-        {
-            From = new MailAddress(
-                senderEmail,
-                "SpeakUp Support"
-            ),
+            To = email,
 
-            Subject = "Your SpeakUp verification code",
+            Subject =
+            "Your SpeakUp verification code",
 
-            Body = 
+
+            HtmlBody =
             $@"
             <html>
             <body>
@@ -78,11 +65,7 @@ public class EmailService
             This code expires in 15 minutes.
             </p>
 
-            <p>
-            If you did not create this account, ignore this email.
-            </p>
-
-            <br>
+            <br/>
 
             <p>
             SpeakUp Team
@@ -90,13 +73,10 @@ public class EmailService
 
             </body>
             </html>
-            ",
-
-            IsBodyHtml = true
+            "
         };
 
-        mail.To.Add(email);
 
-        await smtp.SendMailAsync(mail);
+        await _resend.EmailSendAsync(message);
     }
 }

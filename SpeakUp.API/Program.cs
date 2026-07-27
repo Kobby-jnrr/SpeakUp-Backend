@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Resend;
 using SpeakUp.API.Data;
 using SpeakUp.API.Services;
 using System.Text;
@@ -54,7 +55,18 @@ builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<AuditService>();
-builder.Services.AddSingleton<EmailService>();
+builder.Services.AddOptions();
+
+builder.Services.Configure<ResendClientOptions>(options =>
+{
+    options.ApiToken =
+        builder.Configuration["Resend:ApiKey"]
+        ?? throw new Exception("Resend API key is missing.");
+}); ;
+
+builder.Services.AddHttpClient<ResendClient>();
+
+builder.Services.AddScoped<EmailService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
