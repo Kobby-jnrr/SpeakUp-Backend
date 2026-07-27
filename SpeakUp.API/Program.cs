@@ -7,6 +7,11 @@ using SpeakUp.API.Services;
 using System.Text;
 using System.Text.Json.Serialization;
 
+Environment.SetEnvironmentVariable(
+    "DOTNET_USE_POLLING_FILE_WATCHER",
+    "true"
+);
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
