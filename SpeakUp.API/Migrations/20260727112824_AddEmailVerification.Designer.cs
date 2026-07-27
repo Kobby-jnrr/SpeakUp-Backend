@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SpeakUp.API.Data;
@@ -11,9 +12,11 @@ using SpeakUp.API.Data;
 namespace SpeakUp.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260727112824_AddEmailVerification")]
+    partial class AddEmailVerification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -362,11 +365,11 @@ namespace SpeakUp.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("EmailVerificationCode")
-                        .HasColumnType("text");
-
                     b.Property<DateTime?>("EmailVerificationExpiry")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailVerificationToken")
+                        .HasColumnType("text");
 
                     b.Property<bool>("EmailVerified")
                         .HasColumnType("boolean");

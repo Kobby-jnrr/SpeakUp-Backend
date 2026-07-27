@@ -23,6 +23,12 @@ public class User
 
     public UserRole Role { get; set; }
 
+    public bool EmailVerified { get; set; } = false;
+
+    public string? EmailVerificationCode { get; set; }
+
+    public DateTime? EmailVerificationExpiry { get; set; }
+
     public ICollection<Report> Reports { get; set; } = new List<Report>();
     public ICollection<ChatConversation> Conversations { get; set; } = new List<ChatConversation>();
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
