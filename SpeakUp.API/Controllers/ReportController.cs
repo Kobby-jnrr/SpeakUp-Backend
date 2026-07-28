@@ -17,11 +17,13 @@ public class ReportController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly AuditService _auditService;
+    private readonly NotificationService _notificationService;
 
-    public ReportController( ApplicationDbContext context, AuditService auditService)
+    public ReportController( ApplicationDbContext context, AuditService auditService, NotificationService notificationService)
     {
         _context = context;
         _auditService = auditService;
+        _notificationService = notificationService;
     }
 
     private async Task<string> GenerateReportCode(string firstName, string lastName)
@@ -94,6 +96,38 @@ public class ReportController : ControllerBase
         _context.Reports.Add(report);
         await _context.SaveChangesAsync();
 
+
+        // Notify student
+        await _notificationService.CreateAsync(
+            userId,
+            "Report Submitted",
+            "Your report has been submitted successfully. A support administrator will review it shortly.",
+            "Report",
+            report.Id
+        );
+
+
+        // Notify admins
+        var admins = await _context.Users
+            .Where(u =>
+                u.Role == UserRole.JuniorAdmin ||
+                u.Role == UserRole.SuperAdmin
+            )
+            .ToListAsync();
+
+
+        foreach (var admin in admins)
+        {
+            await _notificationService.CreateAsync(
+                admin.Id,
+                "New Report Received",
+                "A new incident report has been submitted.",
+                "Report",
+                report.Id
+            );
+        }
+
+
         return Ok(new
         {
             message = "Report created successfully",
@@ -161,6 +195,40 @@ public class ReportController : ControllerBase
         _context.Reports.Add(report);
 
         await _context.SaveChangesAsync();
+
+
+        // Notify student (if not anonymous)
+        if (!dto.IsAnonymous)
+        {
+            await _notificationService.CreateAsync(
+                userId,
+                "Quick Report Submitted",
+                "Your quick report has been submitted successfully.",
+                "Report",
+                report.Id
+            );
+        }
+
+
+        // Notify admins
+        var admins = await _context.Users
+            .Where(u =>
+                u.Role == UserRole.JuniorAdmin ||
+                u.Role == UserRole.SuperAdmin
+            )
+            .ToListAsync();
+
+
+        foreach (var admin in admins)
+        {
+            await _notificationService.CreateAsync(
+                admin.Id,
+                "New Quick Report",
+                "A new quick report has been submitted.",
+                "Report",
+                report.Id
+            );
+        }
 
 
         return Ok(new
@@ -287,11 +355,25 @@ public class ReportController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+
+        // Notify student that admin has claimed the report
+        if (report.StudentId > 0)
+        {
+            await _notificationService.CreateAsync(
+                report.StudentId.Value,
+                "Report Assigned",
+                "Your report has been reviewed and assigned to a support administrator. You can now continue the conversation through chat.",
+                "Report",
+                report.Id
+            );
+        }
+
+
         var studentName = report.Student != null
             ? $"{report.Student.FirstName} {report.Student.LastName}"
             : "Anonymous Student";
 
-         var admin = await _context.Users.FindAsync(adminId);
+        var admin = await _context.Users.FindAsync(adminId);
 
           await _auditService.Log(
               adminId,
@@ -410,8 +492,22 @@ public class ReportController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+
+        // Notify student about status change
+        if (report.StudentId > 0)
+        {
+            await _notificationService.CreateAsync(
+                report.StudentId.Value,
+                "Report Status Updated",
+                $"Your report status has changed to {report.Status}.",
+                "Report",
+                report.Id
+            );
+        }
+
+
         var studentName = report.Student != null
-            ? $"{report.Student.FirstName} {report.Student.LastName}"
+                    ? $"{report.Student.FirstName} {report.Student.LastName}"
             : "Anonymous Student";
 
         await _auditService.Log(
@@ -461,8 +557,22 @@ public class ReportController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+
+        // Notify student
+        if (report.StudentId > 0)
+        {
+            await _notificationService.CreateAsync(
+                report.StudentId.Value,
+                "Report Reassigned",
+                "Your report has been reassigned to another support administrator.",
+                "Report",
+                report.Id
+            );
+        }
+
+
         var studentName = report.Student != null
-            ? $"{report.Student.FirstName} {report.Student.LastName}"
+                    ? $"{report.Student.FirstName} {report.Student.LastName}"
             : "Anonymous Student";
 
         await _auditService.Log(

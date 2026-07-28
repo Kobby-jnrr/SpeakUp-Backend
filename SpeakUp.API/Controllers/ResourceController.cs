@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SpeakUp.API.Data;
 using SpeakUp.API.DTOs.Resource;
 using SpeakUp.API.Models.ResourceModel;
+using SpeakUp.API.Models.UserModel;
 using SpeakUp.API.Services;
 using System.Security.Claims;
 
@@ -15,16 +16,18 @@ public class ResourceController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly AuditService _auditService;
+    private readonly NotificationService _notificationService;
 
 
     public ResourceController(
-        ApplicationDbContext context,
-        AuditService auditService)
+    ApplicationDbContext context,
+    AuditService auditService,
+    NotificationService notificationService)
     {
         _context = context;
         _auditService = auditService;
+        _notificationService = notificationService;
     }
-
 
 
     // PUBLIC: GET PUBLISHED
@@ -40,8 +43,6 @@ public class ResourceController : ControllerBase
     }
 
 
-
-
     // ADMIN: GET ALL (DRAFT + PUBLISHED)
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
     [HttpGet("all")]
@@ -53,9 +54,6 @@ public class ResourceController : ControllerBase
 
         return Ok(resources.Select(MapToDto));
     }
-
-
-
 
 
     // PUBLIC: GET BY ID
@@ -71,10 +69,6 @@ public class ResourceController : ControllerBase
 
         return Ok(MapToDto(resource));
     }
-
-
-
-
 
 
     // ADMIN: CREATE
@@ -116,15 +110,28 @@ public class ResourceController : ControllerBase
             $"Resource: \"{resource.Title}\""
         );
 
+        // Notify students when a resource is published
+        if (resource.IsPublished)
+        {
+            var students = await _context.Users
+                .Where(u => u.Role == UserRole.Student)
+                .ToListAsync();
 
+
+            foreach (var student in students)
+            {
+                await _notificationService.CreateAsync(
+                    student.Id,
+                    "New Resource Available",
+                    $"A new resource \"{resource.Title}\" has been published.",
+                    "Resource",
+                    resource.Id
+                );
+            }
+        }
 
         return Ok(MapToDto(resource));
     }
-
-
-
-
-
 
 
     // ADMIN: UPDATE
@@ -153,16 +160,42 @@ public class ResourceController : ControllerBase
         resource.Category = dto.Category;
         resource.Link = dto.Link;
         resource.ImageUrl = dto.ImageUrl;
+        var wasPublished = resource.IsPublished;
+
+
+        resource.Title = dto.Title;
+        resource.Summary = dto.Summary;
+        resource.Description = dto.Description;
+        resource.Category = dto.Category;
+        resource.Link = dto.Link;
+        resource.ImageUrl = dto.ImageUrl;
         resource.IsPublished = dto.IsPublished;
 
         resource.UpdatedAt = DateTime.UtcNow;
 
 
-
         await _context.SaveChangesAsync();
 
 
+        // Notify students when draft becomes published
+        if (!wasPublished && resource.IsPublished)
+        {
+            var students = await _context.Users
+                .Where(u => u.Role == UserRole.Student)
+                .ToListAsync();
 
+
+            foreach (var student in students)
+            {
+                await _notificationService.CreateAsync(
+                    student.Id,
+                    "New Resource Available",
+                    $"A new resource \"{resource.Title}\" has been published.",
+                    "Resource",
+                    resource.Id
+                );
+            }
+        }
 
         await _auditService.Log(
             userId,
@@ -170,15 +203,8 @@ public class ResourceController : ControllerBase
             $"Resource: \"{resource.Title}\""
         );
 
-
-
         return NoContent();
     }
-
-
-
-
-
 
 
     // ADMIN: DELETE
@@ -220,11 +246,6 @@ public class ResourceController : ControllerBase
 
         return NoContent();
     }
-
-
-
-
-
 
 
     // MAPPER

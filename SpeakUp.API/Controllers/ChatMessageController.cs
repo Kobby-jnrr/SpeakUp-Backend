@@ -5,6 +5,7 @@ using SpeakUp.API.Data;
 using SpeakUp.API.DTOs.Chat;
 using SpeakUp.API.Models.ChatModel;
 using SpeakUp.API.Models.UserModel;
+using SpeakUp.API.Services;
 using System.Security.Claims;
 
 namespace SpeakUp.API.Controllers
@@ -14,10 +15,14 @@ namespace SpeakUp.API.Controllers
     public class ChatMessageController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly NotificationService _notificationService;
 
-        public ChatMessageController(ApplicationDbContext context)
+        public ChatMessageController(
+            ApplicationDbContext context,
+            NotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         [Authorize]
@@ -67,6 +72,36 @@ namespace SpeakUp.API.Controllers
             _context.ChatMessages.Add(message);
 
             await _context.SaveChangesAsync();
+
+
+            // Student sent message -> notify assigned admin
+            if (conversation.StudentId == userId)
+            {
+                if (conversation.AssignedAdminId != null)
+                {
+                    await _notificationService.CreateAsync(
+                        conversation.AssignedAdminId.Value,
+                        "New Chat Message",
+                        "A student has sent you a new message.",
+                        "Chat",
+                        conversation.ReportId
+                    );
+                }
+            }
+
+
+            // Admin sent message -> notify student
+            else if (conversation.AssignedAdminId == userId)
+            {
+                await _notificationService.CreateAsync(
+                    conversation.StudentId,
+                    "New Chat Message",
+                    "Your support administrator has sent you a new message.",
+                    "Chat",
+                    conversation.ReportId
+                );
+            }
+
 
             return Ok(new
             {

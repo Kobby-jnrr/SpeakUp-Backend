@@ -120,8 +120,6 @@ public class HomePageContentController : ControllerBase
     }
 
 
-
-
     // ADMIN: GET ALL CONTENT
     [Authorize(Roles = "JuniorAdmin,SuperAdmin")]
     [HttpGet("all")]
@@ -154,9 +152,6 @@ public class HomePageContentController : ControllerBase
 
         return Ok(content);
     }
-
-
-
 
 
     // ADMIN: TOGGLE ACTIVE/INACTIVE
@@ -208,11 +203,6 @@ public class HomePageContentController : ControllerBase
         });
     }
 
-
-
-
-
-
     // STUDENT: GET ACTIVE HOMEPAGE CONTENT
     [AllowAnonymous]
     [HttpGet("home")]
@@ -261,13 +251,10 @@ public class HomePageContentController : ControllerBase
             .ToList();
 
 
-
-
         var safetyTips = content
             .Where(c => c.Type == ContentType.SafetyTip)
             .OrderByDescending(c => c.CreatedAt)
             .ToList();
-
 
 
         var randomSafetyTip = safetyTips
@@ -282,9 +269,6 @@ public class HomePageContentController : ControllerBase
                 CreatedAt = c.CreatedAt
             })
             .FirstOrDefault();
-
-
-
 
         return Ok(new
         {

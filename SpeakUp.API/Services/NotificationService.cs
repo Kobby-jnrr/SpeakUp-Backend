@@ -1,19 +1,40 @@
-﻿namespace SpeakUp.API.Services;
+﻿using SpeakUp.API.Data;
+using SpeakUp.API.Models.NotificationModel;
+
+namespace SpeakUp.API.Services;
 
 public class NotificationService
 {
-    public void NotifyUser(int userId, string message)
-    {
-        // FUTURE:
-        // - email
-        // - push notification
-        // - in-app notification
+    private readonly ApplicationDbContext _context;
 
-        Console.WriteLine($"Notify {userId}: {message}");
+    public NotificationService(ApplicationDbContext context)
+    {
+        _context = context;
     }
 
-    public void NotifyAdmin(int adminId, string message)
+
+    public async Task CreateAsync(
+        int userId,
+        string title,
+        string message,
+        string type,
+        int? reportId = null
+    )
     {
-        Console.WriteLine($"Notify Admin {adminId}: {message}");
+        var notification = new Notification
+        {
+            UserId = userId,
+            Title = title,
+            Message = message,
+            Type = type,
+            ReportId = reportId,
+            IsRead = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+
+        _context.Notifications.Add(notification);
+
+        await _context.SaveChangesAsync();
     }
 }

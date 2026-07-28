@@ -16,14 +16,17 @@ namespace SpeakUp.API.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly AuditService _auditService;
+        private readonly NotificationService _notificationService;
 
 
         public ChatConversationController(
             ApplicationDbContext context,
-            AuditService auditService)
+            AuditService auditService,
+            NotificationService notificationService)
         {
             _context = context;
             _auditService = auditService;
+            _notificationService = notificationService;
         }
 
 
@@ -84,6 +87,26 @@ namespace SpeakUp.API.Controllers
             _context.ChatConversations.Add(conversation);
 
             await _context.SaveChangesAsync();
+
+            // Notify admins about new chat
+            var admins = await _context.Users
+                .Where(u =>
+                    u.Role == UserRole.JuniorAdmin ||
+                    u.Role == UserRole.SuperAdmin
+                )
+                .ToListAsync();
+
+
+            foreach (var admin in admins)
+            {
+                await _notificationService.CreateAsync(
+                    admin.Id,
+                    "New Chat Request",
+                    "A student has started a new support conversation.",
+                    "Chat",
+                    dto.ReportId
+                );
+            }
 
 
 
@@ -340,6 +363,25 @@ namespace SpeakUp.API.Controllers
             conversation.PreviousAdminId =
                 conversation.AssignedAdminId;
 
+            var previousAdminId = conversation.AssignedAdminId;
+
+            conversation.PreviousAdminId =
+                conversation.AssignedAdminId;
+
+            conversation.AssignedAdminId =
+                dto.AdminId;
+
+            if (previousAdminId != null && conversation.StudentId > 0)
+            {
+                await _notificationService.CreateAsync(
+                    conversation.StudentId,
+                    "Chat Reassigned",
+                    $"{admin.FirstName} {admin.LastName} is now handling your conversation.",
+                    "Chat",
+                    conversation.ReportId
+                );
+            }
+
 
             conversation.AssignedAdminId =
                 dto.AdminId;
@@ -348,6 +390,19 @@ namespace SpeakUp.API.Controllers
                 ConversationStatus.Open;
 
             await _context.SaveChangesAsync();
+
+
+            // Notify student
+            if (conversation.StudentId > 0)
+            {
+                await _notificationService.CreateAsync(
+                    conversation.StudentId,
+                    "Chat Assigned",
+                    $"{admin.FirstName} {admin.LastName} has joined your support conversation.",
+                    "Chat",
+                    conversation.ReportId
+                );
+            }
 
             var studentName = conversation.IsAnonymous
             ? "Anonymous User"
@@ -453,6 +508,18 @@ namespace SpeakUp.API.Controllers
 
 
             await _context.SaveChangesAsync();
+
+            // Notify student
+            if (conversation.StudentId > 0)
+            {
+                await _notificationService.CreateAsync(
+                    conversation.StudentId,
+                    "Chat Closed",
+                    "Your support conversation has been closed.",
+                    "Chat",
+                    conversation.ReportId
+                );
+            }
 
 
             var studentName = conversation.IsAnonymous
