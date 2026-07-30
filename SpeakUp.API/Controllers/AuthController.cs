@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SpeakUp.API.Data;
 using SpeakUp.API.DTOs.Auth;
 using SpeakUp.API.Models.UserModel;
+using SpeakUp.API.Models.AdminModel;
 using SpeakUp.API.Services;
 
 namespace SpeakUp.API.Controllers;
@@ -399,114 +400,291 @@ public class AuthController : ControllerBase
         });
     }
 
-
-    // CREATE JUNIOR ADMIN
+    // CREATE ADMIN INVITATION
     [Authorize(Roles = "SuperAdmin")]
-    [HttpPost("create-junior-admin")]
-    public async Task<IActionResult> CreateJuniorAdmin(CreateAdminDto dto)
+    [HttpPost("create-admin-invitation")]
+    public async Task<IActionResult> CreateAdminInvitation(
+        CreateAdminInvitationDto dto)
     {
+
+        // Check email already exists
         var existingUser = await _context.Users
-            .FirstOrDefaultAsync(x => x.Email == dto.Email);
+            .AnyAsync(x => x.Email == dto.Email);
 
 
-        if (existingUser != null)
-            return BadRequest("User already exists");
-
-
-        var admin = new User
+        if (existingUser)
         {
-            FirstName = dto.FirstName,
-            LastName = dto.LastName,
+            return BadRequest(
+                "An account with this email already exists."
+            );
+        }
+
+
+        // Check if invitation already exists
+        var existingInvitation =
+            await _context.AdminInvitations
+            .FirstOrDefaultAsync(x =>
+                x.Email == dto.Email &&
+                !x.IsUsed
+            );
+
+
+        if (existingInvitation != null)
+        {
+            return BadRequest(
+                "An active invitation already exists for this email."
+            );
+        }
+
+
+
+        // Limit SuperAdmins
+        if (dto.Role == UserRole.SuperAdmin)
+        {
+            var superAdminCount =
+                await _context.Users
+                .CountAsync(x => x.Role == UserRole.SuperAdmin);
+
+
+            if (superAdminCount >= 3)
+            {
+                return BadRequest(
+                    "Maximum SuperAdmins reached."
+                );
+            }
+        }
+
+
+
+        var token =
+            Guid.NewGuid()
+            .ToString();
+
+
+
+        var creatorId = int.Parse(
+            User.FindFirst(
+                System.Security.Claims.ClaimTypes.NameIdentifier
+            )!.Value
+        );
+
+
+
+        var invitation = new AdminInvitation
+        {
             Email = dto.Email,
-            PhoneNumber = dto.PhoneNumber,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Role = UserRole.JuniorAdmin,
-            EmailVerified = true
+
+            Role = dto.Role,
+
+            Token = token,
+
+            CreatedBy = creatorId,
+
+            CreatedAt = DateTime.UtcNow,
+
+            ExpiryDate =
+                DateTime.UtcNow.AddHours(24),
+
+            IsUsed = false
         };
 
-        _context.Users.Add(admin);
+
+
+        _context.AdminInvitations.Add(invitation);
+
 
         await _context.SaveChangesAsync();
 
-        var creatorId = int.Parse(
-            User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value
-        );
+
 
         await _auditService.Log(
             creatorId,
-            "Created Junior Admin",
-            admin.Email
+            "Created Admin Invitation",
+            $"{dto.Email} - {dto.Role}"
+        );
+
+
+
+        var frontendUrl =
+            _configuration["FrontendUrl"];
+
+
+
+        var signupLink =
+            $"{frontendUrl}/admin-signup?token={token}";
+
+        await _emailService.SendAdminInvitationEmail(
+            dto.Email,
+            dto.Role.ToString(),
+            signupLink
         );
 
 
 
         return Ok(new
         {
-            message = "Junior Admin created successfully",
-            admin.Id,
-            admin.Email,
-            admin.Role
+            message =
+            "Admin invitation created successfully.",
+
+            email = dto.Email,
+
+            role = dto.Role,
+
+            signupLink
         });
     }
 
-    // CREATE SUPER ADMIN
-    [Authorize(Roles = "SuperAdmin")]
-    [HttpPost("create-super-admin")]
-    public async Task<IActionResult> CreateSuperAdmin(CreateAdminDto dto)
+    // VALIDATE ADMIN INVITATION
+    [AllowAnonymous]
+    [HttpGet("validate-admin-invitation/{token}")]
+    public async Task<IActionResult> ValidateAdminInvitation(
+        string token)
     {
-        var existingUser = await _context.Users
-            .FirstOrDefaultAsync(x => x.Email == dto.Email);
+        var invitation =
+            await _context.AdminInvitations
+            .FirstOrDefaultAsync(x =>
+                x.Token == token
+            );
 
-        if (existingUser != null)
-            return BadRequest("User already exists");
 
-        var superAdminCount = await _context.Users
-            .CountAsync(u => u.Role == UserRole.SuperAdmin);
+        if (invitation == null)
+        {
+            return BadRequest(
+                "Invalid invitation."
+            );
+        }
 
-        if (superAdminCount >= 3)
-            return BadRequest("Maximum SuperAdmins reached.");
 
-        var admin = new User
+        if (invitation.IsUsed)
+        {
+            return BadRequest(
+                "This invitation has already been used."
+            );
+        }
+
+
+        if (invitation.ExpiryDate < DateTime.UtcNow)
+        {
+            return BadRequest(
+                "This invitation has expired."
+            );
+        }
+
+
+        return Ok(new
+        {
+            email = invitation.Email,
+
+            role = invitation.Role
+        });
+    }
+
+    // COMPLETE ADMIN REGISTRATION
+    [AllowAnonymous]
+    [HttpPost("complete-admin-registration")]
+    public async Task<IActionResult> CompleteAdminRegistration(
+        CompleteAdminRegistrationDto dto)
+    {
+
+        var invitation =
+            await _context.AdminInvitations
+            .FirstOrDefaultAsync(x =>
+                x.Token == dto.Token
+            );
+
+
+        if (invitation == null)
+        {
+            return BadRequest(
+                "Invalid invitation."
+            );
+        }
+
+
+        if (invitation.IsUsed)
+        {
+            return BadRequest(
+                "Invitation already used."
+            );
+        }
+
+
+        if (invitation.ExpiryDate < DateTime.UtcNow)
+        {
+            return BadRequest(
+                "Invitation expired."
+            );
+        }
+
+
+
+        var existingUser =
+            await _context.Users
+            .AnyAsync(x =>
+                x.Email == invitation.Email
+            );
+
+
+        if (existingUser)
+        {
+            return BadRequest(
+                "Account already exists."
+            );
+        }
+
+
+
+        var user = new User
         {
             FirstName = dto.FirstName,
+
             LastName = dto.LastName,
-            Email = dto.Email,
+
+            Email = invitation.Email,
+
             PhoneNumber = dto.PhoneNumber,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Role = UserRole.SuperAdmin,
+
+            PasswordHash =
+                BCrypt.Net.BCrypt.HashPassword(
+                    dto.Password
+                ),
+
+            Role = invitation.Role,
+
             EmailVerified = true
         };
 
 
 
-        _context.Users.Add(admin);
+        _context.Users.Add(user);
+
+
+
+        // Mark invitation as used
+        invitation.IsUsed = true;
+
+
 
         await _context.SaveChangesAsync();
 
 
 
-        var creatorId = int.Parse(
-            User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value
-        );
-
-
         await _auditService.Log(
-            creatorId,
-            "Created Super Admin",
-            admin.Email
+            user.Id,
+            "Created Admin Account",
+            $"{user.Email} - {user.Role}"
         );
+
 
 
         return Ok(new
         {
-            message = "Super Admin created successfully",
-            admin.Id,
-            admin.Email,
-            admin.Role
+            message =
+            "Admin account created successfully."
         });
     }
 
-  
+
 
     // DELETE USER
     [Authorize(Roles = "SuperAdmin")]

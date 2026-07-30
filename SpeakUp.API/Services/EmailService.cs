@@ -168,4 +168,104 @@ public class EmailService
 
         await _resend.EmailSendAsync(message);
     }
+
+    public async Task SendAdminInvitationEmail(
+    string email,
+    string role,
+    string signupLink)
+    {
+        var fromEmail =
+            _configuration["Resend:FromEmail"];
+
+
+        if (string.IsNullOrEmpty(fromEmail))
+        {
+            throw new Exception(
+                "Resend FromEmail missing."
+            );
+        }
+
+
+
+        var message = new EmailMessage
+        {
+            From = fromEmail,
+
+            To = email,
+
+            Subject =
+            "You have been invited to join SpeakUp Admin Portal",
+
+
+            HtmlBody =
+            $@"
+        <html>
+        <body>
+
+        <h2>Welcome to SpeakUp</h2>
+
+
+        <p>
+        You have been invited to create a 
+        <strong>{role}</strong> account on the SpeakUp platform.
+        </p>
+
+
+        <p>
+        SpeakUp is a student support and reporting system 
+        designed to help manage student safety and concerns.
+        </p>
+
+
+        <p>
+        Click the button below to complete your account setup:
+        </p>
+
+
+        <a href='{signupLink}'
+        style='
+        display:inline-block;
+        padding:12px 20px;
+        background:#2563eb;
+        color:white;
+        text-decoration:none;
+        border-radius:8px;
+        font-weight:bold;
+        '>
+        Create Admin Account
+        </a>
+
+
+        <p>
+        This invitation link can only be used once.
+        </p>
+
+
+        <p>
+        The link expires in 24 hours.
+        </p>
+
+
+        <p>
+        If you were not expecting this invitation, 
+        you can safely ignore this email.
+        </p>
+
+
+        <br/>
+
+
+        <p>
+        SpeakUp Team
+        </p>
+
+
+        </body>
+        </html>
+        "
+        };
+
+
+        await _resend.EmailSendAsync(message);
+    }
 }

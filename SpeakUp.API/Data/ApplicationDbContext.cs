@@ -6,6 +6,7 @@ using SpeakUp.API.Models.ReportModel;
 using SpeakUp.API.Models.ResourceModel;
 using SpeakUp.API.Models.UserModel;
 using SpeakUp.API.Models.NotificationModel;
+using SpeakUp.API.Models.AdminModel;
 
 namespace SpeakUp.API.Data
 {
@@ -24,6 +25,7 @@ namespace SpeakUp.API.Data
         public DbSet<Resource> Resources { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<AdminInvitation> AdminInvitations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
